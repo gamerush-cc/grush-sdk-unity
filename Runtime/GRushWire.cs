@@ -50,6 +50,38 @@ namespace GRushSdk
     }
 
     [Serializable]
+    internal class GRushPlayerStateWire
+    {
+        public string pseudoId;
+        public int revision;
+        public string updatedAt;
+    }
+
+    [Serializable]
+    internal class GRushReportResultWire
+    {
+        public bool reported;
+    }
+
+    [Serializable]
+    internal class GRushPlayerStateQueryWire
+    {
+        public string[] pseudoIds;
+    }
+
+    [Serializable]
+    internal class GRushPlayerStateEnvelope
+    {
+        public GRushPlayerStateWire state;
+    }
+
+    [Serializable]
+    internal class GRushPlayerStateListEnvelope
+    {
+        public GRushPlayerStateWire[] states;
+    }
+
+    [Serializable]
     internal class GRushLeaderboardWire
     {
         public string key;
@@ -295,6 +327,80 @@ namespace GRushSdk
                 Total = wire.total,
                 RawJson = rawJson,
             };
+        }
+
+        public static string PlayerStateParams(string payloadJson, int baseRevision)
+        {
+            var builder = new StringBuilder("{");
+            if (baseRevision >= 0)
+            {
+                builder.Append("\"baseRevision\":").Append(baseRevision).Append(',');
+            }
+            // payload は呼び出し側が組み立てた生 JSON をそのまま載せる。
+            // 壊れた JSON と 4KB 超はサーバが 400 で弾く。
+            // **必ず最後に置く。** そうすると取り出しが「"payload": から
+            // 末尾の } まで」で厳密に決まり、中身に何が入っても壊れない。
+            builder
+                .Append("\"payload\":")
+                .Append(string.IsNullOrEmpty(payloadJson) ? "null" : payloadJson);
+            return builder.Append('}').ToString();
+        }
+
+        public static string PlayerStateReportParams(string pseudoId)
+        {
+            return "{\"pseudoId\":" + Escape(pseudoId ?? string.Empty) + "}";
+        }
+
+        public static string PlayerStateQuery(string[] pseudoIds)
+        {
+            var builder = new StringBuilder("{\"pseudoIds\":[");
+            if (pseudoIds != null)
+            {
+                for (var index = 0; index < pseudoIds.Length; index++)
+                {
+                    if (index > 0)
+                    {
+                        builder.Append(',');
+                    }
+                    builder.Append(Escape(pseudoIds[index] ?? string.Empty));
+                }
+            }
+            return builder.Append("]}").ToString();
+        }
+
+        public static GRushPlayerState ToPlayerState(GRushPlayerStateWire wire)
+        {
+            return new GRushPlayerState
+            {
+                PseudoId = wire.pseudoId,
+                Revision = wire.revision,
+                UpdatedAt = wire.updatedAt,
+            };
+        }
+
+        /// <summary>
+        /// <see cref="PlayerStateParams"/> が組んだ params から payload を取り出す。
+        /// payload は必ず末尾にあるので、手書きの JSON パーサを持たずに済む。
+        /// </summary>
+        public static string ExtractPayloadJson(string paramsJson)
+        {
+            if (string.IsNullOrEmpty(paramsJson))
+            {
+                return null;
+            }
+            const string marker = "\"payload\":";
+            var start = paramsJson.IndexOf(marker, System.StringComparison.Ordinal);
+            if (start < 0)
+            {
+                return null;
+            }
+            start += marker.Length;
+            var end = paramsJson.LastIndexOf('}');
+            if (end <= start)
+            {
+                return null;
+            }
+            return paramsJson.Substring(start, end - start).Trim();
         }
 
         public static T Parse<T>(string json)

@@ -41,6 +41,35 @@ namespace GRushSdk
         public string Transport;
     }
 
+    /// <summary>
+    /// 他プレイヤーへ見える公開状態のメタ情報。
+    ///
+    /// **payload はここに入らない。** 任意形状の JSON は
+    /// <c>UnityEngine.JsonUtility</c> では型に落とせず、SDK に手書きの
+    /// パーサを持たせると壊れ方が読めなくなるため、応答の生 JSON を
+    /// <see cref="GRushPlayerStatePage.RawJson"/> として1つだけ渡し、
+    /// パースはゲーム側の任意のパーサへ委ねる（ランキングの metadata と同じ理由）。
+    /// </summary>
+    [Serializable]
+    public struct GRushPlayerState
+    {
+        public string PseudoId;
+        public int Revision;
+        public string UpdatedAt;
+    }
+
+    /// <summary>
+    /// 公開プレイヤー状態の取得結果。<see cref="RawJson"/> は応答そのもので、
+    /// payload が要るゲームはこれを自前のパーサへ渡す。
+    /// </summary>
+    [Serializable]
+    public struct GRushPlayerStatePage
+    {
+        public GRushPlayerState[] States;
+        public bool Exists;
+        public string RawJson;
+    }
+
     [Serializable]
     public struct GRushLeaderboard
     {

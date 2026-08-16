@@ -74,12 +74,56 @@ namespace GRushSdk
                         GRushErrorCode.ConsentDeclined,
                         "Friend leaderboards require per-game friend consent."
                     );
+                case "playerState.getMine":
+                    return GRushRpcResponse.Success(
+                        mockPlayerState == null ? "{\"state\":null}" : mockPlayerState
+                    );
+                case "playerState.setMine":
+                    return SetPlayerState(paramsJson);
+                case "playerState.get":
+                    return GRushRpcResponse.Success(GRushMockPlayerStates.GetJson(paramsJson));
                 default:
                     return GRushRpcResponse.Failure(
                         GRushErrorCode.Unsupported,
                         "The mock backend does not implement " + method + "."
                     );
             }
+        }
+
+        private string mockPlayerState;
+        private int mockPlayerStateRevision;
+
+        /// <summary>
+        /// モックでも payload の形と大きさだけは実サーバと同じに縛る。
+        /// エディタで通ったものが実環境で 400 になると原因を掴めない。
+        /// </summary>
+        private GRushRpcResponse SetPlayerState(string paramsJson)
+        {
+            var payload = GRushWire.ExtractPayloadJson(paramsJson);
+            if (payload == null || !payload.TrimStart().StartsWith("{"))
+            {
+                return GRushRpcResponse.Failure(
+                    GRushErrorCode.InvalidParams,
+                    "Player state payload must be a JSON object."
+                );
+            }
+            if (payload.Length > 4096)
+            {
+                return GRushRpcResponse.Failure(
+                    GRushErrorCode.InvalidParams,
+                    "Player state payload is too large."
+                );
+            }
+            mockPlayerStateRevision += 1;
+            mockPlayerState =
+                "{\"state\":{\"pseudoId\":"
+                + GRushWire.Escape(PseudoId)
+                + ",\"payload\":"
+                + payload
+                + ",\"revision\":"
+                + mockPlayerStateRevision
+                + ",\"updatedAt\":\"\"}}";
+            return GRushRpcResponse.Success(mockPlayerState);
         }
 
         private GRushRpcResponse SubmitScore(string paramsJson)
