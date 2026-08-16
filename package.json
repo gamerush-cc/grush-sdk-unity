@@ -1,0 +1,28 @@
+{
+  "name": "cc.gamerush.sdk",
+  "version": "1.0.0",
+  "displayName": "GameRush SDK",
+  "description": "GameRush の GameAPI を Unity から呼ぶための SDK。プレイヤー疑似ID・プロフィール同意・リアルタイムマルチプレイに対応し、エディタとスタンドアロンではモックへ落ちる。",
+  "unity": "2021.3",
+  "keywords": [
+    "gamerush",
+    "webgl",
+    "multiplayer"
+  ],
+  "author": {
+    "name": "GameRush",
+    "url": "https://gamerush.cc"
+  },
+  "samples": [
+    {
+      "displayName": "Score Attack",
+      "description": "疑似IDと表示名の同意を使ったスコアアタック。",
+      "path": "Samples~/ScoreAttack"
+    },
+    {
+      "displayName": "Duel",
+      "description": "GRush.Net を使った2人対戦。エディタではモックの対戦相手と動く。",
+      "path": "Samples~/Duel"
+    }
+  ]
+}
