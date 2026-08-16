@@ -9,6 +9,7 @@ namespace GRushSdk
         public int Index;
         public string PseudoId;
         public string DisplayName;
+        public string AvatarUrl;
         public GRushMockPeer Peer;
         public Action<GRushNetEvent> Deliver;
     }
@@ -44,6 +45,7 @@ namespace GRushSdk
             string requestedCode,
             string pseudoId,
             string displayName,
+            string avatarUrl,
             Action<GRushNetEvent> deliver
         )
         {
@@ -56,6 +58,7 @@ namespace GRushSdk
                 Index = NextFreeIndex(),
                 PseudoId = pseudoId,
                 DisplayName = displayName,
+                AvatarUrl = avatarUrl,
                 Deliver = deliver,
             };
             var existing = new List<GRushPeerWire>();
@@ -79,19 +82,21 @@ namespace GRushSdk
             };
         }
 
-        public GRushMockPeer AddPeer(string displayName)
+        public GRushMockPeer AddPeer(string displayName, string avatarUrl)
         {
             var peer = new GRushMockPeer
             {
                 Index = NextFreeIndex(),
                 PseudoId = "mock-peer-" + Guid.NewGuid().ToString("N").Substring(0, 8),
                 DisplayName = displayName,
+                AvatarUrl = avatarUrl,
             };
             var member = new GRushMockMember
             {
                 Index = peer.Index,
                 PseudoId = peer.PseudoId,
                 DisplayName = peer.DisplayName,
+                AvatarUrl = peer.AvatarUrl,
                 Peer = peer,
             };
             members.Add(member);
@@ -239,6 +244,7 @@ namespace GRushSdk
                 index = member.Index,
                 pseudoId = member.PseudoId,
                 displayName = member.DisplayName,
+                avatarUrl = member.AvatarUrl,
             };
         }
 
@@ -251,6 +257,8 @@ namespace GRushSdk
             builder.Append(
                 member.DisplayName == null ? "null" : GRushWire.Escape(member.DisplayName)
             );
+            builder.Append(",\"avatarUrl\":");
+            builder.Append(member.AvatarUrl == null ? "null" : GRushWire.Escape(member.AvatarUrl));
             return builder.Append('}').ToString();
         }
     }

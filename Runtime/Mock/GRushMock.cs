@@ -12,7 +12,12 @@ namespace GRushSdk
 
         public static GRushMockPeer AddPeer(string displayName)
         {
-            return GRushMockHub.Instance.AddPeer(displayName);
+            return AddPeer(displayName, null);
+        }
+
+        public static GRushMockPeer AddPeer(string displayName, string avatarUrl)
+        {
+            return GRushMockHub.Instance.AddPeer(displayName, avatarUrl);
         }
 
         public static void RemovePeer(GRushMockPeer peer)
@@ -31,6 +36,7 @@ namespace GRushSdk
         public int Index { get; internal set; }
         public string PseudoId { get; internal set; }
         public string DisplayName { get; internal set; }
+        public string AvatarUrl { get; internal set; }
 
         public event Action<GRushMessage> Received;
 

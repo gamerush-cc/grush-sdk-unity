@@ -24,6 +24,7 @@ namespace GRushSdk
         public int Index;
         public string PseudoId;
         public string DisplayName;
+        public string AvatarUrl;
     }
 
     public struct GRushMessage

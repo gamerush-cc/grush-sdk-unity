@@ -26,6 +26,7 @@ namespace GRushSdk
         public int index;
         public string pseudoId;
         public string displayName;
+        public string avatarUrl;
     }
 
     [Serializable]
@@ -113,6 +114,7 @@ namespace GRushSdk
                 Index = wire.index,
                 PseudoId = wire.pseudoId,
                 DisplayName = wire.displayName,
+                AvatarUrl = wire.avatarUrl,
             };
         }
 

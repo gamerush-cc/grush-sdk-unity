@@ -97,6 +97,7 @@ namespace GRushSdk
                 request == null ? null : request.roomCode,
                 PseudoId,
                 Consented ? GRushMock.DisplayName : null,
+                Consented ? GRushMock.AvatarUrl : null,
                 OnHubEvent
             );
             localIndex = wire.localPeerIndex;
