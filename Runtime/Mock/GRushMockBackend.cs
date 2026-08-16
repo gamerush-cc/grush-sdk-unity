@@ -61,12 +61,56 @@ namespace GRushSdk
                     GRushMockHub.Instance.Leave(localIndex);
                     localIndex = -1;
                     return GRushRpcResponse.Success("null");
+                case "leaderboard.list":
+                    return GRushRpcResponse.Success(GRushMockLeaderboards.ListJson());
+                case "leaderboard.submit":
+                    return SubmitScore(paramsJson);
+                case "leaderboard.top":
+                    return PageForQuery(paramsJson, false);
+                case "leaderboard.aroundMe":
+                    return PageForQuery(paramsJson, true);
+                case "leaderboard.friends":
+                    return GRushRpcResponse.Failure(
+                        GRushErrorCode.ConsentDeclined,
+                        "Friend leaderboards require per-game friend consent."
+                    );
                 default:
                     return GRushRpcResponse.Failure(
                         GRushErrorCode.Unsupported,
                         "The mock backend does not implement " + method + "."
                     );
             }
+        }
+
+        private GRushRpcResponse SubmitScore(string paramsJson)
+        {
+            var request = GRushWire.Parse<GRushSubmitParamsWire>(paramsJson);
+            if (request == null || string.IsNullOrEmpty(request.key))
+            {
+                return GRushRpcResponse.Failure(
+                    GRushErrorCode.InvalidParams,
+                    "A leaderboard key is required."
+                );
+            }
+            return GRushMockLeaderboards.Submit(request.key, request.value, PseudoId);
+        }
+
+        private static GRushRpcResponse PageForQuery(string paramsJson, bool aroundMe)
+        {
+            var query = GRushWire.Parse<GRushLeaderboardQueryWire>(paramsJson);
+            if (query == null || string.IsNullOrEmpty(query.key))
+            {
+                return GRushRpcResponse.Failure(
+                    GRushErrorCode.InvalidParams,
+                    "A leaderboard key is required."
+                );
+            }
+            return GRushMockLeaderboards.Page(
+                query.key,
+                aroundMe ? query.range : query.limit,
+                query.offset,
+                aroundMe
+            );
         }
 
         private GRushRpcResponse RequestProfile()

@@ -11,6 +11,7 @@ namespace GRushSdk
         private static IGRushBackend backend;
         private static GRushPlayerApi player;
         private static GRushNetApi net;
+        private static GRushLeaderboardsApi leaderboards;
 
         public static IGRushBackend Backend
         {
@@ -58,10 +59,23 @@ namespace GRushSdk
             }
         }
 
+        public static GRushLeaderboardsApi Leaderboards
+        {
+            get
+            {
+                if (leaderboards == null)
+                {
+                    leaderboards = new GRushLeaderboardsApi();
+                }
+                return leaderboards;
+            }
+        }
+
         public static void UseBackend(IGRushBackend replacement)
         {
             net = null;
             player = null;
+            leaderboards = null;
             backend = replacement ?? GRushBackendFactory.Create();
         }
 
