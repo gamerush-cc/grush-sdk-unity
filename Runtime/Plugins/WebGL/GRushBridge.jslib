@@ -71,9 +71,20 @@ var GRushBridgeLibrary = {
       return room.describe();
     },
 
+    wrap: function (promise, key) {
+      return promise.then(function (value) {
+        var envelope = {};
+        envelope[key] = value === undefined ? null : value;
+        return envelope;
+      });
+    },
+
     invoke: function (method, params) {
       var player = GRushBridge.api("GRushPlayer");
       var net = GRushBridge.api("GRushNet");
+      var boards = GRushBridge.api("GRushLeaderboards");
+      var states = GRushBridge.api("GRushPlayerState");
+      var args = params || {};
       if (method === "player.getSelf" && player) return player.getSelf();
       if (method === "player.requestProfile" && player) return player.requestProfile();
       if (method === "player.revokeProfile" && player) return player.revokeProfile();
@@ -81,6 +92,36 @@ var GRushBridgeLibrary = {
       if (method === "net.leave" && net) {
         if (GRushBridge.unbind) GRushBridge.unbind();
         return net.room ? net.room.leave() : Promise.resolve(null);
+      }
+      if (method === "leaderboard.list" && boards) {
+        return GRushBridge.wrap(boards.list(), "leaderboards");
+      }
+      if (method === "leaderboard.submit" && boards) {
+        return GRushBridge.wrap(
+          boards.submit(args.key, args.value, args.metadata, args.operationId),
+          "result",
+        );
+      }
+      if (method === "leaderboard.top" && boards) {
+        return GRushBridge.wrap(boards.top(args.key, args), "leaderboard");
+      }
+      if (method === "leaderboard.aroundMe" && boards) {
+        return GRushBridge.wrap(boards.aroundMe(args.key, args), "leaderboard");
+      }
+      if (method === "leaderboard.friends" && boards) {
+        return GRushBridge.wrap(boards.friends(args.key, args), "leaderboard");
+      }
+      if (method === "playerState.getMine" && states) {
+        return GRushBridge.wrap(states.getMine(), "state");
+      }
+      if (method === "playerState.setMine" && states) {
+        return GRushBridge.wrap(states.setMine(args.payload, args.baseRevision), "state");
+      }
+      if (method === "playerState.get" && states) {
+        return GRushBridge.wrap(states.get(args.pseudoIds), "states");
+      }
+      if (method === "playerState.report" && states) {
+        return GRushBridge.wrap(states.report(args.pseudoId), "reported");
       }
       return Promise.reject({
         code: "unsupportedMethod",
