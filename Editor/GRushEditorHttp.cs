@@ -75,14 +75,23 @@ namespace GRushSdk.Editor
             return request;
         }
 
-        public static UnityWebRequest PutBytes(
+        /// <summary>
+        /// ビルドのファイルは**ディスクから流す**。サーバの上限は総量 300MB で
+        /// ファイル単位の上限が無いため、1本の大きな <c>.data</c> を丸ごと
+        /// メモリへ読むとエディタごと落ちる。再送のたびに読み直しになるが、
+        /// 同じ URL への PUT は上書きなので問題ない。
+        /// </summary>
+        public static UnityWebRequest PutFile(
             string url,
-            byte[] body,
+            string filePath,
             Dictionary<string, string> headers
         )
         {
             var request = new UnityWebRequest(url, "PUT");
-            request.uploadHandler = new UploadHandlerRaw(body);
+            var upload = new UploadHandlerFile(filePath);
+            upload.contentType = "application/octet-stream";
+            request.uploadHandler = upload;
+            request.disposeUploadHandlerOnDispose = true;
             request.downloadHandler = new DownloadHandlerBuffer();
             if (headers != null)
             {

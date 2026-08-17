@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 
 namespace GRushSdk.Editor
 {
@@ -93,10 +92,15 @@ namespace GRushSdk.Editor
             GRushHttpSlot outcome
         )
         {
-            var body = File.ReadAllBytes(ticket.File.FullPath);
             for (var attempt = 1; attempt <= PutAttempts; attempt++)
             {
-                using (var request = GRushEditorHttp.PutBytes(ticket.Url, body, ticket.Headers))
+                using (
+                    var request = GRushEditorHttp.PutFile(
+                        ticket.Url,
+                        ticket.File.FullPath,
+                        ticket.Headers
+                    )
+                )
                 {
                     var operation = request.SendWebRequest();
                     while (!operation.isDone)

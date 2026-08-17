@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -113,12 +112,52 @@ namespace GRushSdk.Editor
             };
         }
 
+        /// <summary>
+        /// 権限を絞れなければ保存しない。書いてから絞れないと分かった場合も
+        /// 消して例外を投げる — 誰でも読める場所に平文の bearer トークンを
+        /// 置いたまま「保存できた」と返すのが一番まずい。
+        /// </summary>
         public static void Save(GRushCredentials credentials)
         {
             var directory = DirectoryPath();
             Directory.CreateDirectory(directory);
-            RestrictToOwner(directory);
+            GRushEditorFilePermissions.RestrictToOwner(directory, true);
 
+            var path = FilePath;
+            File.WriteAllText(path, Serialize(credentials), new UTF8Encoding(false));
+            try
+            {
+                GRushEditorFilePermissions.RestrictToOwner(path, false);
+            }
+            catch (Exception)
+            {
+                if (!TryDelete(path))
+                {
+                    throw new InvalidOperationException(
+                        "権限を絞れなかったトークンを消せませんでした。"
+                            + path
+                            + " を手で消し、Studio でこのトークンを失効させてください。"
+                    );
+                }
+                throw;
+            }
+        }
+
+        private static bool TryDelete(string path)
+        {
+            try
+            {
+                File.Delete(path);
+                return !File.Exists(path);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        private static string Serialize(GRushCredentials credentials)
+        {
             var builder = new StringBuilder("{");
             builder.Append("\"origin\":").Append(GRushJsonText.Escape(credentials.Origin));
             builder.Append(",\"token\":").Append(GRushJsonText.Escape(credentials.Token));
@@ -127,11 +166,7 @@ namespace GRushSdk.Editor
             builder.Append(",\"expiresAt\":").Append(GRushJsonText.Escape(credentials.ExpiresAt));
             builder.Append(",\"scopes\":").Append(Array(credentials.Scopes));
             builder.Append(",\"gameIds\":").Append(Array(credentials.GameIds));
-            builder.Append('}');
-
-            var path = FilePath;
-            File.WriteAllText(path, builder.ToString(), new UTF8Encoding(false));
-            RestrictToOwner(path);
+            return builder.Append('}').ToString();
         }
 
         private static string Array(string[] values)
@@ -158,36 +193,6 @@ namespace GRushSdk.Editor
             if (File.Exists(path))
             {
                 File.Delete(path);
-            }
-        }
-
-        private static void RestrictToOwner(string path)
-        {
-            if (Application.platform == RuntimePlatform.WindowsEditor)
-            {
-                return;
-            }
-            try
-            {
-                var mode = Directory.Exists(path) ? "700" : "600";
-                var startInfo = new ProcessStartInfo("/bin/chmod", mode + " \"" + path + "\"")
-                {
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                };
-                using (var process = Process.Start(startInfo))
-                {
-                    if (process != null)
-                    {
-                        process.WaitForExit(5000);
-                    }
-                }
-            }
-            catch (Exception error)
-            {
-                UnityEngine.Debug.LogWarning(
-                    "GameRush: トークンファイルの権限を絞れませんでした: " + error.Message
-                );
             }
         }
     }

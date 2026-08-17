@@ -165,7 +165,7 @@ namespace GRushSdk.Editor
                 yield break;
             }
 
-            Credentials = new GRushCredentials
+            var issued = new GRushCredentials
             {
                 Origin = origin,
                 Token = secret,
@@ -175,7 +175,16 @@ namespace GRushSdk.Editor
                 Scopes = token.Get("scopes").AsStringArray() ?? new string[0],
                 GameIds = token.Get("gameIds").AsStringArray(),
             };
-            GRushEditorCredentials.Save(Credentials);
+            try
+            {
+                GRushEditorCredentials.Save(issued);
+            }
+            catch (Exception error)
+            {
+                Fail(error.Message + " Studio でこのトークンを失効させてください。");
+                yield break;
+            }
+            Credentials = issued;
             Status = "ログインしました。";
         }
 
