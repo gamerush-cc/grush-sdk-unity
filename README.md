@@ -1,13 +1,13 @@
 # GameRush SDK for Unity
 
-GameRush の GameAPI を Unity から呼ぶための UPM パッケージ。導入手順・API リファレンス・注意点の正は [docs/sdk-guide.md](../../../docs/sdk-guide.md)。
+GameRush の GameAPI を Unity から呼ぶための UPM パッケージ。ビルドの書き出し方は [対応エンジンと書き出しガイド](https://gamerush.cc/engines)。
 
 ## 導入
 
 Package Manager の `Add package from git URL...` に次を入れる。
 
 ```text
-https://github.com/<owner>/<repo>.git?path=sdk/unity/cc.gamerush.sdk
+https://github.com/gamerush-cc/grush-sdk-unity.git
 ```
 
 Unity 2021.3 以降。ビルドターゲットは WebGL。
