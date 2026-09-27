@@ -18,7 +18,6 @@ namespace GRushSdk.Editor
     internal static class GRushEditorRecommendedSettings
     {
         public const long GuidelineBytes = 30L * 1024 * 1024;
-        public const string Template = "APPLICATION:Minimal";
 
         private static readonly GraphicsDeviceType[] WebGl2Only = { GraphicsDeviceType.OpenGLES3 };
 
@@ -139,13 +138,6 @@ namespace GRushSdk.Editor
                     () => PlayerSettings.WebGL.dataCaching,
                     false,
                     value => PlayerSettings.WebGL.dataCaching = value
-                ),
-                Rule(
-                    "WebGL Template",
-                    () => PlayerSettings.WebGL.template,
-                    Template,
-                    () => PlayerSettings.WebGL.template == Template,
-                    () => PlayerSettings.WebGL.template = Template
                 ),
                 Toggle(
                     "Development Build",

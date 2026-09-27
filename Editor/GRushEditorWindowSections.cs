@@ -156,7 +156,7 @@ namespace GRushSdk.Editor
                 MessageType.Info
             );
             newGameConfirmRights = EditorGUILayout.ToggleLeft(
-                "このゲームの素材（画像・音・コードなど）をすべて自分で作ったか、使う権利を持っています",
+                "このゲームと、それに含まれる第三者アセット（画像・音源・フォント・ライブラリ等）について、自身の著作物であるか、GameRush への掲載および利用規約 §4 の許諾に必要な一切の権利・許諾を有していることを確認しました",
                 newGameConfirmRights,
                 EditorStyles.wordWrappedLabel
             );

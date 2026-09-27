@@ -61,7 +61,7 @@ opponent.Received += message => opponent.Send(reply, GRushChannel.Unreliable, GR
 - ビルドが通ると、その出力先が「ビルドをアップロード」に入った状態になる。ログインしていればそのまま上げられる。
 - 合計サイズの目安は 30 MB 以下。300 MB を超えるとアップロードできない。
 
-主な推奨値は Brotli 圧縮・Decompression Fallback オフ・Threads Support オフ（GameRush の配信は COOP/COEP を付けない）・Data Caching オフ（GameRush が自前で先読みする）・WebGL 2 のみ・テンプレート Minimal・Development Build オフ。
+主な推奨値は Brotli 圧縮・Decompression Fallback オフ・Threads Support オフ（GameRush の配信は COOP/COEP を付けない）・Data Caching オフ（GameRush が自前で先読みする）・WebGL 2 のみ・Development Build オフ。
 
 CI などからはコマンドラインで同じことができる。
 

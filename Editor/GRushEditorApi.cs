@@ -84,10 +84,6 @@ namespace GRushSdk.Editor
             onDone(games);
         }
 
-        /// <summary>
-        /// **再試行しない。** サーバに冪等キーが無いので、応答を取りこぼした
-        /// まま送り直すと2つ目のゲームができる。
-        /// </summary>
         public static IEnumerator CreateGame(
             GRushEditorClient client,
             string title,
@@ -106,6 +102,15 @@ namespace GRushSdk.Editor
 
             var slot = new GRushHttpSlot();
             yield return client.Post("/api/games", body.ToString(), slot);
+            var errorCode =
+                slot.Result.Json == null ? "" : slot.Result.Json.Get("code").AsString("");
+            if (!slot.Result.Ok && errorCode == "rights.confirmRequired")
+            {
+                onError(
+                    "サーバが素材の権利の確認を受け付けませんでした。GameRush SDK を最新版に更新してから、もう一度作成してください。"
+                );
+                yield break;
+            }
             if (!slot.Result.Ok || slot.Result.Json == null)
             {
                 onError(
@@ -128,11 +133,6 @@ namespace GRushSdk.Editor
             );
         }
 
-        /// <summary>
-        /// key での冪等な適用。無ければ作り、内容が違えば更新し、同じなら
-        /// 何もしない。投稿が1件でもある枠の意味づけ（sort / valueType /
-        /// aggregation / period）を変えると 409 で返る。
-        /// </summary>
         public static IEnumerator DeclareLeaderboard(
             GRushEditorClient client,
             string gameId,
