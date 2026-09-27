@@ -38,6 +38,7 @@ namespace GRushSdk.Editor
         private string newGameTitle = "";
         private string newGameDescription = "";
         private int newGameVisibility;
+        private bool newGameConfirmRights;
         private string buildDirectory = "";
         private GRushBuildManifest manifest;
         private Vector2 scroll;

@@ -40,6 +40,7 @@ namespace GRushSdk.Editor
             }
             newGameTitle = "";
             newGameDescription = "";
+            newGameConfirmRights = false;
             notice = created.Title + " を作りました。ビルドを上げてください。";
             yield return RefreshGames();
             SelectGame(created.Id);

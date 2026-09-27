@@ -101,7 +101,8 @@ namespace GRushSdk.Editor
             body.Append("\"title\":").Append(GRushJsonText.Escape(title));
             body.Append(",\"description\":").Append(GRushJsonText.Escape(description));
             body.Append(",\"visibility\":").Append(GRushJsonText.Escape(visibility));
-            body.Append(",\"acceptTerms\":true}");
+            body.Append(",\"acceptTerms\":true");
+            body.Append(",\"confirmAssetRights\":true}");
 
             var slot = new GRushHttpSlot();
             yield return client.Post("/api/games", body.ToString(), slot);

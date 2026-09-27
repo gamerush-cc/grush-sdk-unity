@@ -9,6 +9,7 @@ namespace GRushSdk.Editor
         {
             scroll = EditorGUILayout.BeginScrollView(scroll);
             DrawGate();
+            DrawRecommendedBuild();
             if (!gate.Blocked)
             {
                 DrawAccount();
@@ -154,7 +155,13 @@ namespace GRushSdk.Editor
                     + "一般公開（public）への申請は Studio から行います。",
                 MessageType.Info
             );
-            using (new EditorGUI.DisabledScope(busy || newGameTitle.Trim().Length == 0))
+            newGameConfirmRights = EditorGUILayout.ToggleLeft(
+                "このゲームの素材（画像・音・コードなど）をすべて自分で作ったか、使う権利を持っています",
+                newGameConfirmRights,
+                EditorStyles.wordWrappedLabel
+            );
+            var ready = newGameTitle.Trim().Length > 0 && newGameConfirmRights;
+            using (new EditorGUI.DisabledScope(busy || !ready))
             {
                 if (GUILayout.Button("作成する（再試行はしません）"))
                 {
