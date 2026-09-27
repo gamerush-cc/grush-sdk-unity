@@ -17,7 +17,7 @@ namespace GRushSdk.Editor
 
     internal static class GRushEditorRecommendedSettings
     {
-        public const long GuidelineBytes = 30L * 1024 * 1024;
+        public const long GuidelineBytes = 15L * 1024 * 1024;
 
         private static readonly GraphicsDeviceType[] WebGl2Only = { GraphicsDeviceType.OpenGLES3 };
 

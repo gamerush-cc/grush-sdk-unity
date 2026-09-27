@@ -59,7 +59,7 @@ opponent.Received += message => opponent.Send(reply, GRushChannel.Unreliable, GR
 - **推奨設定を適用**: ✗ の項目だけを推奨値へ変える。変えた設定は元に戻さない（`GameRush/推奨設定を適用` からも同じ）。
 - **推奨設定でビルド**: 設定を適用してから、Build Settings で有効なシーンを WebGL でビルドする（`GameRush/推奨設定でビルド` からも同じ）。出力先は既定で `<プロジェクト>/Build/GameRush`。**出力先のフォルダはビルドのたびに消して作り直す**ので、プロジェクトのフォルダそのものや `Assets/` `Packages/` `ProjectSettings/` `Library/` の中は選べない。既にあるフォルダは、中身が `Build/` `TemplateData/` `StreamingAssets/` `index.html` だけか空のときに限って消す。
 - ビルドが通ると、その出力先が「ビルドをアップロード」に入った状態になる。ログインしていればそのまま上げられる。
-- 合計サイズの目安は 30 MB 以下。300 MB を超えるとアップロードできない。
+- 合計サイズの目安は 15 MB 以下。30 MB 以上は読み込みが遅く、スマホで落ちることもあるので危険。50 MB を超えるとアップロードできない。
 
 主な推奨値は Brotli 圧縮・Decompression Fallback オフ・Threads Support オフ（GameRush の配信は COOP/COEP を付けない）・Data Caching オフ（GameRush が自前で先読みする）・WebGL 2 のみ・Development Build オフ。
 
