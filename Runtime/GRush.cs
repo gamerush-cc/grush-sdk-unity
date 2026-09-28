@@ -40,7 +40,7 @@ namespace GRushSdk
             get { return IsAvailable && Backend.ProtocolVersion >= PlayerStateProtocolVersion; }
         }
 
-        public static bool IsShareSupported
+        public static bool IsShareAvailable
         {
             get { return IsAvailable && Backend.ProtocolVersion >= ShareProtocolVersion; }
         }

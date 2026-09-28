@@ -48,7 +48,7 @@ namespace GRushSdk
 
         public async Task<bool> IsAvailableAsync()
         {
-            if (!GRush.IsShareSupported)
+            if (!GRush.IsShareAvailable)
             {
                 return false;
             }
@@ -98,7 +98,7 @@ namespace GRushSdk
         {
             var completion = new TaskCompletionSource<GRushResult<GRushShareStatus>>();
             var backend = GRush.Backend as IGRushShareBackend;
-            if (!GRush.IsShareSupported || backend == null)
+            if (!GRush.IsShareAvailable || backend == null)
             {
                 completion.SetResult(GRushResult<GRushShareStatus>.Unsupported());
                 return completion.Task;
