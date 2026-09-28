@@ -6,13 +6,8 @@ namespace GRushSdk
     public static class GRush
     {
         public const int RequiredProtocolVersion = 1;
-
-        /// <summary>
-        /// 公開プレイヤー状態が使えるランタイムの版数。**基本機能ごと止めない。**
-        /// 版数を一律で上げると、古いランタイムのままのビルドでネットもプレイヤー
-        /// API も死ぬ。機能単位で落とす。
-        /// </summary>
         public const int PlayerStateProtocolVersion = 2;
+        public const int ShareProtocolVersion = 3;
         public const int MaxMessageBytes = 8 * 1024;
 
         private static IGRushBackend backend;
@@ -20,6 +15,7 @@ namespace GRushSdk
         private static GRushNetApi net;
         private static GRushLeaderboardsApi leaderboards;
         private static GRushPlayerStateApi playerState;
+        private static GRushShareApi share;
 
         public static IGRushBackend Backend
         {
@@ -38,10 +34,14 @@ namespace GRushSdk
             get { return Backend.ProtocolVersion; }
         }
 
-        /// <summary>公開プレイヤー状態を呼べるか。古いランタイムでは false。</summary>
         public static bool IsPlayerStateAvailable
         {
             get { return IsAvailable && Backend.ProtocolVersion >= PlayerStateProtocolVersion; }
+        }
+
+        public static bool IsShareSupported
+        {
+            get { return IsAvailable && Backend.ProtocolVersion >= ShareProtocolVersion; }
         }
 
         public static bool IsAvailable
@@ -97,12 +97,25 @@ namespace GRushSdk
             }
         }
 
+        public static GRushShareApi Share
+        {
+            get
+            {
+                if (share == null)
+                {
+                    share = new GRushShareApi();
+                }
+                return share;
+            }
+        }
+
         public static void UseBackend(IGRushBackend replacement)
         {
             net = null;
             player = null;
             leaderboards = null;
             playerState = null;
+            share = null;
             backend = replacement ?? GRushBackendFactory.Create();
         }
 

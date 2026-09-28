@@ -9,6 +9,8 @@ namespace GRushSdk
         public static string AvatarUrl = null;
         public static bool GrantProfileConsent = true;
         public static double UnreliableDropRate = 0.0;
+        public static bool ShareAvailable = true;
+        public static GRushShareStatus ShareStatus = GRushShareStatus.Opened;
 
         public static GRushMockPeer AddPeer(string displayName)
         {

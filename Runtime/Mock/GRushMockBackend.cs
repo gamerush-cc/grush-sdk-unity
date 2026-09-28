@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace GRushSdk
 {
-    public sealed class GRushMockBackend : IGRushBackend
+    public sealed class GRushMockBackend : IGRushBackend, IGRushShareBackend
     {
         private const string PseudoIdKey = "grush.mock.pseudoId";
         private const string ConsentKey = "grush.mock.profileConsent";
@@ -18,12 +18,30 @@ namespace GRushSdk
 
         public int ProtocolVersion
         {
-            get { return GRush.RequiredProtocolVersion; }
+            get { return GRush.ShareProtocolVersion; }
         }
 
         public void Call(string method, string paramsJson, Action<GRushRpcResponse> onDone)
         {
             var response = Handle(method, paramsJson);
+            if (onDone != null)
+            {
+                GRushDispatcher.Post(() => onDone(response));
+            }
+        }
+
+        public void Share(string paramsJson, byte[] image, Action<GRushRpcResponse> onDone)
+        {
+            Debug.Log(
+                "[GRushMock] share " + paramsJson + " image=" + (image == null ? 0 : image.Length) + "B"
+            );
+            var response = GRushMock.ShareAvailable
+                ? GRushRpcResponse.Success(
+                    GRushMock.ShareStatus == GRushShareStatus.Opened
+                        ? "{\"status\":\"opened\"}"
+                        : "{\"status\":\"cancelled\"}"
+                )
+                : GRushRpcResponse.Failure(GRushErrorCode.Unavailable, "Sharing is unavailable here.");
             if (onDone != null)
             {
                 GRushDispatcher.Post(() => onDone(response));
@@ -82,6 +100,10 @@ namespace GRushSdk
                     return SetPlayerState(paramsJson);
                 case "playerState.get":
                     return GRushRpcResponse.Success(GRushMockPlayerStates.GetJson(paramsJson));
+                case "share.getAvailability":
+                    return GRushRpcResponse.Success(
+                        GRushMock.ShareAvailable ? "{\"available\":true}" : "{\"available\":false}"
+                    );
                 default:
                     return GRushRpcResponse.Failure(
                         GRushErrorCode.Unsupported,
@@ -93,10 +115,6 @@ namespace GRushSdk
         private string mockPlayerState;
         private int mockPlayerStateRevision;
 
-        /// <summary>
-        /// モックでも payload の形と大きさだけは実サーバと同じに縛る。
-        /// エディタで通ったものが実環境で 400 になると原因を掴めない。
-        /// </summary>
         private GRushRpcResponse SetPlayerState(string paramsJson)
         {
             var payload = GRushWire.ExtractPayloadJson(paramsJson);

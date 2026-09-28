@@ -7,7 +7,7 @@ using AOT;
 
 namespace GRushSdk
 {
-    internal sealed class GRushWebGLBackend : IGRushBackend
+    internal sealed class GRushWebGLBackend : IGRushBackend, IGRushShareBackend
     {
         private delegate void RpcCallback(int requestId, int ok, IntPtr json, int length);
         private delegate void NetCallback(
@@ -33,6 +33,14 @@ namespace GRushSdk
 
         [DllImport("__Internal")]
         private static extern void GRushJsSend(byte[] payload, int length, int channel, int to);
+
+        [DllImport("__Internal")]
+        private static extern void GRushJsShare(
+            int requestId,
+            string paramsJson,
+            byte[] image,
+            int length
+        );
 
         private static readonly RpcCallback RpcHandler = OnRpc;
         private static readonly NetCallback NetHandler = OnNet;
@@ -66,6 +74,22 @@ namespace GRushSdk
                 Pending[requestId] = onDone;
             }
             GRushJsCall(requestId, method, paramsJson ?? string.Empty);
+        }
+
+        public void Share(string paramsJson, byte[] image, Action<GRushRpcResponse> onDone)
+        {
+            EnsureInitialized();
+            var requestId = nextRequestId++;
+            if (onDone != null)
+            {
+                Pending[requestId] = onDone;
+            }
+            GRushJsShare(
+                requestId,
+                paramsJson ?? string.Empty,
+                image,
+                image == null ? 0 : image.Length
+            );
         }
 
         public void Send(byte[] payload, int count, GRushChannel channel, int to)

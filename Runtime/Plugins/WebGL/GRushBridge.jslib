@@ -123,10 +123,40 @@ var GRushBridgeLibrary = {
       if (method === "playerState.report" && states) {
         return GRushBridge.wrap(states.report(args.pseudoId), "reported");
       }
+      var share = GRushBridge.api("GRushShare");
+      if (method === "share.open" && share) return share.share(args);
+      if (method === "share.getAvailability" && share) {
+        return GRushBridge.wrap(share.isAvailable(), "available");
+      }
       return Promise.reject({
         code: "unsupportedMethod",
         message: "GameRush does not expose " + method + " here.",
       });
+    },
+
+    run: function (requestId, method, params) {
+      try {
+        GRushBridge.invoke(method, params).then(
+          function (value) {
+            GRushBridge.respond(requestId, 1, JSON.stringify(value === undefined ? null : value));
+          },
+          function (error) {
+            GRushBridge.fail(requestId, error);
+          },
+        );
+      } catch (error) {
+        GRushBridge.fail(requestId, error);
+      }
+    },
+
+    parse: function (requestId, paramsPtr) {
+      var raw = paramsPtr ? UTF8ToString(paramsPtr) : "";
+      try {
+        return { ok: true, params: raw ? JSON.parse(raw) : undefined };
+      } catch (error) {
+        GRushBridge.fail(requestId, { code: "invalidParams", message: "Params were not JSON." });
+        return { ok: false };
+      }
     },
   },
 
@@ -149,28 +179,19 @@ var GRushBridgeLibrary = {
 
   GRushJsCall: function (requestId, methodPtr, paramsPtr) {
     var method = UTF8ToString(methodPtr);
-    var raw = paramsPtr ? UTF8ToString(paramsPtr) : "";
-    var params;
-    try {
-      params = raw ? JSON.parse(raw) : undefined;
-    } catch (error) {
-      GRushBridge.fail(requestId, { code: "invalidParams", message: "Params were not JSON." });
-      return;
-    }
-    try {
-      GRushBridge.invoke(method, params).then(
-        function (value) {
-          GRushBridge.respond(requestId, 1, JSON.stringify(value === undefined ? null : value));
-        },
-        function (error) {
-          GRushBridge.fail(requestId, error);
-        },
-      );
-    } catch (error) {
-      GRushBridge.fail(requestId, error);
-    }
+    var parsed = GRushBridge.parse(requestId, paramsPtr);
+    if (parsed.ok) GRushBridge.run(requestId, method, parsed.params);
   },
   GRushJsCall__deps: ["$GRushBridge", "malloc", "free"],
+
+  GRushJsShare: function (requestId, paramsPtr, dataPtr, length) {
+    var parsed = GRushBridge.parse(requestId, paramsPtr);
+    if (!parsed.ok) return;
+    var params = parsed.params || {};
+    if (dataPtr && length > 0) params.image = new Blob([HEAPU8.slice(dataPtr, dataPtr + length)]);
+    GRushBridge.run(requestId, "share.open", params);
+  },
+  GRushJsShare__deps: ["$GRushBridge", "malloc", "free"],
 
   GRushJsSend: function (dataPtr, length, channel, to) {
     var net = GRushBridge.api("GRushNet");

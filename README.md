@@ -34,6 +34,18 @@ if (joined.Ok)
 
 `GRush` は例外を投げない。GameRush の外で動かした場合も `GRushResult<T>.Ok` が `false`、`Code` が `GRushErrorCode.Unsupported` になるだけで、ゲームは止まらない。
 
+### 共有
+
+```csharp
+if (await GRush.Share.IsAvailableAsync())
+{
+    var shared = await GRush.Share.ShareScreenAsync("ステージ3をクリア");
+    var png = await GRush.Share.ShareAsync("記録更新", texture.EncodeToPNG());
+}
+```
+
+GameRush の確認シートが出て、プレイヤーが送り先を押したときに共有が開く。返るのは `GRushShareStatus.Opened` / `Cancelled` だけ。`ShareScreenAsync` はゲームの canvas のスクショを送る（画面に DOM で重ねた文字は写らない）。本文は 100 文字までで、URL と @メンションを含むと `InvalidParams`。古い GameRush（`protocolVersion` 3 未満）では `Unsupported`。
+
 ## エディタでの動作確認
 
 WebGL 以外（エディタ・スタンドアロン）では自動的に `GRushMockBackend` が使われる。`GRushMock` で挙動を切り替える。
@@ -43,12 +55,15 @@ GRushMock.SignedIn = true;
 GRushMock.DisplayName = "Editor Player";
 GRushMock.GrantProfileConsent = false;
 GRushMock.UnreliableDropRate = 0.1;
+GRushMock.ShareStatus = GRushShareStatus.Cancelled;
 
 var opponent = GRushMock.AddPeer("Sparring Partner");
 opponent.Received += message => opponent.Send(reply, GRushChannel.Unreliable, GRushRoom.Everyone);
 ```
 
 `GRushMock.AddPeer` で作った相手は同じプロセス内の2人目の peer として部屋に入り、送受信が実際に往復する。
+
+共有のモックは確認シートを出さず、`GRushMock.ShareStatus`（既定 `Opened`）を返す。`GRushMock.ShareAvailable = false` で共有できない環境を試せる。本文と画像の検査はしない。
 
 **`UnreliableDropRate` は既定 0 だが、出荷前に必ず 0 より大きくして試すこと。** WebSocket 中継では `unreliable` も落ちずに届くため、パケットが落ちる前提で書けているかを確認できる場所はエディタのモックだけになる。
 
