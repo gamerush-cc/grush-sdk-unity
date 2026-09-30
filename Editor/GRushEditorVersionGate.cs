@@ -45,6 +45,8 @@ namespace GRushSdk.Editor
 
     internal sealed class GRushVersionGate
     {
+        private const string FailurePrefix = "最低版数を確認できませんでした: ";
+
         private readonly GRushEditorGateStatus status = new GRushEditorGateStatus();
 
         public string MinVersion = "";
@@ -79,7 +81,15 @@ namespace GRushSdk.Editor
             status.Resolve(reachable, minVersion, GRushEditorPackage.Version);
             if (status.State == GRushGateState.Failed)
             {
-                Error = "最低版数を確認できませんでした: " + slot.Result.Message();
+                Error = FailurePrefix + slot.Result.Message();
+            }
+        }
+
+        public void FailChecking(string reason)
+        {
+            if (status.FailChecking())
+            {
+                Error = FailurePrefix + reason;
             }
         }
 

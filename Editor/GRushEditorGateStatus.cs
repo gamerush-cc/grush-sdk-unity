@@ -21,6 +21,16 @@ namespace GRushSdk.Editor
             State = GRushGateState.Checking;
         }
 
+        public bool FailChecking()
+        {
+            if (State != GRushGateState.Checking)
+            {
+                return false;
+            }
+            State = GRushGateState.Failed;
+            return true;
+        }
+
         public void Resolve(bool reachable, string minVersion, string version)
         {
             if (!reachable || minVersion == null || Parse(minVersion) == null)

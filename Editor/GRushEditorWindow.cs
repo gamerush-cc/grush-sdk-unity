@@ -121,6 +121,7 @@ namespace GRushSdk.Editor
         {
             busy = false;
             login = null;
+            gate.FailChecking(failure.Message);
             error = failure.Message;
             Debug.LogException(failure);
             Repaint();
