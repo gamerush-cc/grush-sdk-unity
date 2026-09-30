@@ -7,7 +7,7 @@ GameRush の GameAPI を Unity から呼ぶための UPM パッケージ。ビ�
 Package Manager の `Add package from git URL...` に次を入れる。
 
 ```text
-https://github.com/gamerush-cc/grush-sdk-unity.git
+https://github.com/gamerush-cc/grush-sdk-unity.git#v1.2.0
 ```
 
 Unity 2021.3 以降。ビルドターゲットは WebGL。
@@ -45,6 +45,19 @@ if (await GRush.Share.IsAvailableAsync())
 
 GameRush の確認シートが出て、プレイヤーが送り先を押したときに共有が開く。返るのは `GRushShareStatus.Opened` / `Cancelled` だけ。`ShareScreenAsync` はゲームの canvas のスクショを送る（画面に DOM で重ねた文字は写らない）。自前の画像を送るなら `ShareAsync(text, texture.EncodeToPNG())`。共有は 5 秒に 1 回までなので、1 回のボタン操作で呼ぶのはどちらか一方にする。共有したことを条件に報酬を出さない。本文は 100 文字までで、URL と @メンションを含むと `InvalidParams`。古い GameRush（`protocolVersion` 3 未満）では `Unsupported`。
 
+### 表示言語
+
+```csharp
+var result = await GRush.Locale.GetAsync();
+if (result.Ok)
+{
+    var tag = result.Value.Locale;
+}
+GRush.Locale.Changed += locale => Debug.Log(locale.Locale);
+```
+
+`GRushLocale` は `Locale`（BCP 47 のタグ。`ja` や `zh-Hans`）、`Source`（`user` / `system` / `device`）、`Languages`（優先順）を持つ。`GRush.Locale.Current` は取得済みなら同期で読め、無ければ `null`。`Changed` は次の `Update` で配られる。`GRush.IsLocaleAvailable` が `false`（`protocolVersion` 4 未満）では `GetAsync` が `Unsupported` を返す。
+
 ## エディタでの動作確認
 
 WebGL 以外（エディタ・スタンドアロン）では自動的に `GRushMockBackend` が使われる。`GRushMock` で挙動を切り替える。
@@ -61,6 +74,8 @@ opponent.Received += message => opponent.Send(reply, GRushChannel.Unreliable, GR
 ```
 
 `GRushMock.AddPeer` で作った相手は同じプロセス内の2人目の peer として部屋に入り、送受信が実際に往復する。
+
+表示言語のモックは `GRushMock.SetLocale("en")`（`Source` は `user`）で切り替わり、`Changed` が飛ぶ。未設定なら `Application.systemLanguage` から写した値を `Source = "device"` で返す。
 
 共有のモックは確認シートを出さず、`GRushMock.ShareStatus`（既定 `Opened`）を返す。`GRushMock.ShareAvailable = false` で共有できない環境を試せる。本文と画像の検査はしない。
 

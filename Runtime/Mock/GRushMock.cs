@@ -27,8 +27,19 @@ namespace GRushSdk
             GRushMockHub.Instance.RemovePeer(peer);
         }
 
+        public static void SetLocale(string locale)
+        {
+            GRushMockLocale.Set(locale, "user", null);
+        }
+
+        public static void SetLocale(string locale, string source, string[] languages)
+        {
+            GRushMockLocale.Set(locale, source, languages);
+        }
+
         public static void Reset()
         {
+            GRushMockLocale.Reset();
             GRushMockHub.Reset();
         }
     }

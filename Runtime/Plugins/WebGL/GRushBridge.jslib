@@ -3,9 +3,14 @@ var GRushBridgeLibrary = {
     onRpc: 0,
     onNet: 0,
     unbind: null,
+    unbindLocale: null,
 
     api: function (name) {
       return typeof window === "undefined" ? null : window[name] || null;
+    },
+
+    localeApi: function () {
+      return GRushBridge.api("GRushLocale") || GRushBridge.api("GameRushLocale");
     },
 
     respond: function (requestId, ok, text) {
@@ -123,6 +128,8 @@ var GRushBridgeLibrary = {
       if (method === "playerState.report" && states) {
         return GRushBridge.wrap(states.report(args.pseudoId), "reported");
       }
+      var locale = GRushBridge.localeApi();
+      if (method === "locale.get" && locale) return locale.get();
       var share = GRushBridge.api("GRushShare");
       if (method === "share.open" && share) return share.share(args);
       if (method === "share.getAvailability" && share) {
@@ -192,6 +199,31 @@ var GRushBridgeLibrary = {
     GRushBridge.run(requestId, "share.open", params);
   },
   GRushJsShare__deps: ["$GRushBridge", "malloc", "free"],
+
+  GRushJsLocaleCurrent: function () {
+    var locale = GRushBridge.localeApi();
+    var snapshot = locale ? locale.current() : null;
+    var text = snapshot ? JSON.stringify(snapshot) : "";
+    var size = lengthBytesUTF8(text) + 1;
+    var ptr = _malloc(size);
+    stringToUTF8(text, ptr, size);
+    return ptr;
+  },
+  GRushJsLocaleCurrent__deps: ["$GRushBridge", "malloc"],
+
+  GRushJsLocaleSubscribe: function (onLocale) {
+    var locale = GRushBridge.localeApi();
+    if (!locale || GRushBridge.unbindLocale) return;
+    GRushBridge.unbindLocale = locale.onChange(function (snapshot) {
+      var text = JSON.stringify(snapshot);
+      var size = lengthBytesUTF8(text) + 1;
+      var ptr = _malloc(size);
+      stringToUTF8(text, ptr, size);
+      {{{ makeDynCall("vii", "onLocale") }}}(ptr, size - 1);
+      _free(ptr);
+    });
+  },
+  GRushJsLocaleSubscribe__deps: ["$GRushBridge", "malloc", "free"],
 
   GRushJsSend: function (dataPtr, length, channel, to) {
     var net = GRushBridge.api("GRushNet");

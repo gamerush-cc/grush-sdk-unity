@@ -3,12 +3,13 @@ using UnityEngine;
 
 namespace GRushSdk
 {
-    public sealed class GRushMockBackend : IGRushBackend, IGRushShareBackend
+    public sealed class GRushMockBackend : IGRushBackend, IGRushShareBackend, IGRushLocaleBackend
     {
         private const string PseudoIdKey = "grush.mock.pseudoId";
         private const string ConsentKey = "grush.mock.profileConsent";
 
         private Action<GRushNetEvent> netHandler;
+        private Action<string> localeHandler;
         private int localIndex = -1;
 
         public bool IsAvailable
@@ -18,7 +19,7 @@ namespace GRushSdk
 
         public int ProtocolVersion
         {
-            get { return GRush.ShareProtocolVersion; }
+            get { return GRush.LocaleProtocolVersion; }
         }
 
         public void Call(string method, string paramsJson, Action<GRushRpcResponse> onDone)
@@ -62,6 +63,33 @@ namespace GRushSdk
             netHandler = handler;
         }
 
+        public string LocaleCurrentJson()
+        {
+            return GRushMockLocale.CurrentJson();
+        }
+
+        public void SetLocaleChangedHandler(Action<string> handler)
+        {
+            if (localeHandler != null)
+            {
+                GRushMockLocale.Changed -= OnLocaleChanged;
+            }
+            localeHandler = handler;
+            if (handler != null)
+            {
+                GRushMockLocale.Changed += OnLocaleChanged;
+            }
+        }
+
+        private void OnLocaleChanged(string json)
+        {
+            var handler = localeHandler;
+            if (handler != null)
+            {
+                GRushDispatcher.Post(() => handler(json));
+            }
+        }
+
         private GRushRpcResponse Handle(string method, string paramsJson)
         {
             switch (method)
@@ -100,6 +128,8 @@ namespace GRushSdk
                     return SetPlayerState(paramsJson);
                 case "playerState.get":
                     return GRushRpcResponse.Success(GRushMockPlayerStates.GetJson(paramsJson));
+                case "locale.get":
+                    return GRushRpcResponse.Success(GRushMockLocale.CurrentJson());
                 case "share.getAvailability":
                     return GRushRpcResponse.Success(
                         GRushMock.ShareAvailable ? "{\"available\":true}" : "{\"available\":false}"

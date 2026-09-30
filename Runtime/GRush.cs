@@ -8,6 +8,7 @@ namespace GRushSdk
         public const int RequiredProtocolVersion = 1;
         public const int PlayerStateProtocolVersion = 2;
         public const int ShareProtocolVersion = 3;
+        public const int LocaleProtocolVersion = 4;
         public const int MaxMessageBytes = 8 * 1024;
 
         private static IGRushBackend backend;
@@ -16,6 +17,7 @@ namespace GRushSdk
         private static GRushLeaderboardsApi leaderboards;
         private static GRushPlayerStateApi playerState;
         private static GRushShareApi share;
+        private static GRushLocaleApi locale;
 
         public static IGRushBackend Backend
         {
@@ -34,7 +36,6 @@ namespace GRushSdk
             get { return Backend.ProtocolVersion; }
         }
 
-        /// <summary>公開プレイヤー状態を呼べるか。古いランタイムでは false。</summary>
         public static bool IsPlayerStateAvailable
         {
             get { return IsAvailable && Backend.ProtocolVersion >= PlayerStateProtocolVersion; }
@@ -43,6 +44,11 @@ namespace GRushSdk
         public static bool IsShareAvailable
         {
             get { return IsAvailable && Backend.ProtocolVersion >= ShareProtocolVersion; }
+        }
+
+        public static bool IsLocaleAvailable
+        {
+            get { return IsAvailable && Backend.ProtocolVersion >= LocaleProtocolVersion; }
         }
 
         public static bool IsAvailable
@@ -110,13 +116,31 @@ namespace GRushSdk
             }
         }
 
+        public static GRushLocaleApi Locale
+        {
+            get
+            {
+                if (locale == null)
+                {
+                    locale = new GRushLocaleApi();
+                }
+                return locale;
+            }
+        }
+
         public static void UseBackend(IGRushBackend replacement)
         {
+            var previous = backend as IGRushLocaleBackend;
+            if (previous != null)
+            {
+                previous.SetLocaleChangedHandler(null);
+            }
             net = null;
             player = null;
             leaderboards = null;
             playerState = null;
             share = null;
+            locale = null;
             backend = replacement ?? GRushBackendFactory.Create();
         }
 

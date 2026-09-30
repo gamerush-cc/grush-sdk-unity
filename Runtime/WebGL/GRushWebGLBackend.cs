@@ -7,7 +7,7 @@ using AOT;
 
 namespace GRushSdk
 {
-    internal sealed class GRushWebGLBackend : IGRushBackend, IGRushShareBackend
+    internal sealed class GRushWebGLBackend : IGRushBackend, IGRushShareBackend, IGRushLocaleBackend
     {
         private delegate void RpcCallback(int requestId, int ok, IntPtr json, int length);
         private delegate void NetCallback(
@@ -42,6 +42,16 @@ namespace GRushSdk
             int length
         );
 
+        private delegate void LocaleCallback(IntPtr json, int length);
+
+        [DllImport("__Internal")]
+        private static extern string GRushJsLocaleCurrent();
+
+        [DllImport("__Internal")]
+        private static extern void GRushJsLocaleSubscribe(LocaleCallback onLocale);
+
+        private static readonly LocaleCallback LocaleHandler = OnLocale;
+        private static Action<string> localeHandler;
         private static readonly RpcCallback RpcHandler = OnRpc;
         private static readonly NetCallback NetHandler = OnNet;
         private static readonly Dictionary<int, Action<GRushRpcResponse>> Pending =
@@ -104,6 +114,21 @@ namespace GRushSdk
             netHandler = handler;
         }
 
+        public string LocaleCurrentJson()
+        {
+            return GRushJsLocaleCurrent();
+        }
+
+        public void SetLocaleChangedHandler(Action<string> handler)
+        {
+            var first = localeHandler == null;
+            localeHandler = handler;
+            if (first && handler != null)
+            {
+                GRushJsLocaleSubscribe(LocaleHandler);
+            }
+        }
+
         private static void EnsureInitialized()
         {
             if (initialized)
@@ -151,6 +176,18 @@ namespace GRushSdk
                 netEvent.Detail = ReadString(data, length);
             }
             GRushDispatcher.Post(() => handler(netEvent));
+        }
+
+        [MonoPInvokeCallback(typeof(LocaleCallback))]
+        private static void OnLocale(IntPtr json, int length)
+        {
+            var handler = localeHandler;
+            if (handler == null)
+            {
+                return;
+            }
+            var text = ReadString(json, length);
+            GRushDispatcher.Post(() => handler(text));
         }
 
         private static GRushRpcResponse Succeeded(string text)
