@@ -81,7 +81,7 @@ namespace GRushSdk.Editor
             status.Resolve(reachable, minVersion, GRushEditorPackage.Version);
             if (status.State == GRushGateState.Failed)
             {
-                Error = FailurePrefix + (reachable ? "応答に最低版数がありません" : slot.Result.Message());
+                Error = FailurePrefix + (reachable ? "応答の最低版数を読めません" : slot.Result.Message());
             }
         }
 
