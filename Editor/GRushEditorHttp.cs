@@ -26,10 +26,6 @@ namespace GRushSdk.Editor
             };
         }
 
-        /// <summary>
-        /// 作者へ出す1行。API は文字列の <c>error</c> か、翻訳前提の
-        /// <c>code</c> のどちらかを返すので、両方を拾って素通しする。
-        /// </summary>
         public string Message()
         {
             if (Json != null)
@@ -75,15 +71,10 @@ namespace GRushSdk.Editor
             return request;
         }
 
-        /// <summary>
-        /// ビルドのファイルは**ディスクから流す**。サーバの上限は総量 50MB で
-        /// ファイル単位の上限が無いため、1本の大きな <c>.data</c> を丸ごと
-        /// メモリへ読むとエディタごと落ちる。再送のたびに読み直しになるが、
-        /// 同じ URL への PUT は上書きなので問題ない。
-        /// </summary>
         public static UnityWebRequest PutFile(
             string url,
             string filePath,
+            long size,
             Dictionary<string, string> headers
         )
         {
@@ -93,6 +84,7 @@ namespace GRushSdk.Editor
             request.uploadHandler = upload;
             request.disposeUploadHandlerOnDispose = true;
             request.downloadHandler = new DownloadHandlerBuffer();
+            request.timeout = GRushEditorPutPolicy.TimeoutSeconds(size);
             if (headers != null)
             {
                 foreach (var header in headers)

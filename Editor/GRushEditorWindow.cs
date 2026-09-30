@@ -128,6 +128,12 @@ namespace GRushSdk.Editor
 
         private void StartLogin()
         {
+            if (!gate.AllowsWrites)
+            {
+                error = "対応版の確認が済んでからログインしてください。";
+                Repaint();
+                return;
+            }
             var scopes = new List<string>(BaseScopes);
             if (requestGamesCreate)
             {

@@ -10,7 +10,7 @@ namespace GRushSdk.Editor
             scroll = EditorGUILayout.BeginScrollView(scroll);
             DrawGate();
             DrawRecommendedBuild();
-            if (!gate.Blocked)
+            if (gate.AllowsWrites)
             {
                 DrawAccount();
                 if (credentials != null)
@@ -32,18 +32,31 @@ namespace GRushSdk.Editor
 
         private void DrawGate()
         {
-            if (gate.Blocked)
+            switch (gate.State)
             {
-                EditorGUILayout.HelpBox(gate.BlockedText(), MessageType.Error);
+                case GRushGateState.Checking:
+                    EditorGUILayout.HelpBox("Editor 拡張の対応版を確認しています…", MessageType.Info);
+                    break;
+                case GRushGateState.Rejected:
+                    EditorGUILayout.HelpBox(gate.RejectedText(), MessageType.Error);
+                    break;
+                case GRushGateState.Failed:
+                    EditorGUILayout.HelpBox(
+                        gate.Error + "\n書き込み操作は確認が済むまで使えません。",
+                        MessageType.Error
+                    );
+                    break;
+            }
+            if (!gate.CanRetry)
+            {
+                return;
+            }
+            using (new EditorGUI.DisabledScope(busy))
+            {
                 if (GUILayout.Button("もう一度確認する"))
                 {
                     Run(gate.Check(GRushEditorClient.DefaultOrigin()));
                 }
-                return;
-            }
-            if (gate.Error != null)
-            {
-                EditorGUILayout.HelpBox(gate.Error, MessageType.Warning);
             }
         }
 

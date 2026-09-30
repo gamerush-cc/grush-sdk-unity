@@ -1,20 +1,14 @@
 using System.Collections;
 using System.Collections.Generic;
+using UnityEditor;
 
 namespace GRushSdk.Editor
 {
     internal static class GRushEditorUploader
     {
-        private const int PutAttempts = 3;
         private const long ObjectAlreadyWritten = 412;
         private const long SignatureRejected = 403;
 
-        /// <summary>
-        /// **<c>POST /api/games/:id/builds</c> は機械的に再試行しない。**
-        /// サーバに冪等キーが無く、再試行はもう1つのビルドを作る。失敗したら
-        /// 理由を出して止め、作者に判断させる。個別ファイルの PUT は同じ URL
-        /// への上書きなので再試行してよい。
-        /// </summary>
         public static IEnumerator Run(
             GRushEditorClient client,
             string gameId,
@@ -66,7 +60,7 @@ namespace GRushSdk.Editor
             {
                 if (state.Cancelled)
                 {
-                    Fail(state, "アップロードを中止しました。残り " + state.Pending.Count + " ファイルです。");
+                    FailCancelled(state);
                     yield break;
                 }
                 var ticket = state.Pending[0];
@@ -92,12 +86,18 @@ namespace GRushSdk.Editor
             GRushHttpSlot outcome
         )
         {
-            for (var attempt = 1; attempt <= PutAttempts; attempt++)
+            for (var attempt = 1; attempt <= GRushEditorPutPolicy.Attempts; attempt++)
             {
+                if (state.Cancelled)
+                {
+                    FailCancelled(state);
+                    yield break;
+                }
                 using (
                     var request = GRushEditorHttp.PutFile(
                         ticket.Url,
                         ticket.File.FullPath,
+                        ticket.File.Size,
                         ticket.Headers
                     )
                 )
@@ -120,25 +120,34 @@ namespace GRushSdk.Editor
                     }
                     if (state.Cancelled)
                     {
-                        Fail(state, "アップロードを中止しました。残り " + state.Pending.Count + " ファイルです。");
+                        FailCancelled(state);
                         yield break;
                     }
                     if (result.Status == SignatureRejected)
                     {
+                        state.NeedsComplete = false;
                         Fail(
                             state,
                             ticket.Path
-                                + ": アップロード用の URL が期限切れです（有効期限1時間）。ビルドを作り直してください。"
+                                + ": アップロード用の URL が期限切れです（有効期限1時間）。"
+                                + "『アップロードする』をもう一度押すと新しいビルドで送り直します。"
+                                + "途中のビルドは24時間後に自動で片付きます。"
                         );
                         yield break;
                     }
-                    if (attempt == PutAttempts)
+                    if (attempt == GRushEditorPutPolicy.Attempts)
                     {
                         Fail(state, ticket.Path + ": 送信に失敗しました: " + result.Message());
                         yield break;
                     }
                 }
-                yield return null;
+                var until =
+                    EditorApplication.timeSinceStartup
+                    + GRushEditorPutPolicy.RetryDelaySeconds(attempt);
+                while (!state.Cancelled && EditorApplication.timeSinceStartup < until)
+                {
+                    yield return null;
+                }
             }
         }
 
@@ -165,6 +174,11 @@ namespace GRushSdk.Editor
                     ? "R2 に届いていないファイルが " + missing + " 件ありました。再送してください。"
                     : "ビルドの確定に失敗しました: " + slot.Result.Message()
             );
+        }
+
+        private static void FailCancelled(GRushUploadState state)
+        {
+            Fail(state, "アップロードを中止しました。残り " + state.Pending.Count + " ファイルです。");
         }
 
         private static void Fail(GRushUploadState state, string message)

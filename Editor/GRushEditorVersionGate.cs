@@ -43,40 +43,47 @@ namespace GRushSdk.Editor
         }
     }
 
-    /// <summary>
-    /// サーバが最低版数を配る（<c>GET /api/dev-client/requirements</c>）。
-    /// 判定は <c>packages/shared/src/contracts/dev-client.ts</c> の
-    /// <c>isSupportedDevClientVersion</c> の写し。
-    /// </summary>
     internal sealed class GRushVersionGate
     {
-        public bool Checked;
-        public bool Blocked;
+        private readonly GRushEditorGateStatus status = new GRushEditorGateStatus();
+
         public string MinVersion = "";
         public string Message;
         public string Error;
 
+        public GRushGateState State => status.State;
+
+        public bool AllowsWrites => status.AllowsWrites;
+
+        public bool CanRetry => status.CanRetry;
+
         public IEnumerator Check(string origin)
         {
+            status.Begin();
             Error = null;
+            Message = null;
             var slot = new GRushHttpSlot();
             yield return GRushEditorHttp.Send(
                 GRushEditorHttp.Json(origin + "/api/dev-client/requirements", "GET", null, null),
                 slot
             );
-            Checked = true;
-            if (!slot.Result.Ok || slot.Result.Json == null)
+            var reachable = slot.Result.Ok && slot.Result.Json != null;
+            string minVersion = null;
+            if (reachable)
+            {
+                var requirements = slot.Result.Json.Get("requirements");
+                minVersion = requirements.Get("minVersion").AsString(null);
+                Message = requirements.Get("message").AsString(null);
+                MinVersion = minVersion ?? "";
+            }
+            status.Resolve(reachable, minVersion, GRushEditorPackage.Version);
+            if (status.State == GRushGateState.Failed)
             {
                 Error = "最低版数を確認できませんでした: " + slot.Result.Message();
-                yield break;
             }
-            var requirements = slot.Result.Json.Get("requirements");
-            MinVersion = requirements.Get("minVersion").AsString("0.0.0");
-            Message = requirements.Get("message").AsString(null);
-            Blocked = !IsSupported(GRushEditorPackage.Version, MinVersion);
         }
 
-        public string BlockedText()
+        public string RejectedText()
         {
             var text =
                 "この Editor 拡張は古いため使えません（いま "
@@ -87,58 +94,6 @@ namespace GRushSdk.Editor
                 + MinVersion
                 + " 以上）。SDK を更新してください。";
             return string.IsNullOrEmpty(Message) ? text : text + "\n" + Message;
-        }
-
-        public static bool IsSupported(string version, string minVersion)
-        {
-            var current = Parse(version);
-            var minimum = Parse(minVersion);
-            if (current == null || minimum == null)
-            {
-                return false;
-            }
-            for (var index = 0; index < 3; index++)
-            {
-                if (current[index] != minimum[index])
-                {
-                    return current[index] > minimum[index];
-                }
-            }
-            return true;
-        }
-
-        private static int[] Parse(string value)
-        {
-            var parts = (value ?? "").Split('.');
-            if (parts.Length != 3)
-            {
-                return null;
-            }
-            var numbers = new int[3];
-            for (var index = 0; index < 3; index++)
-            {
-                if (!IsDigits(parts[index]) || !int.TryParse(parts[index], out numbers[index]))
-                {
-                    return null;
-                }
-            }
-            return numbers;
-        }
-
-        private static bool IsDigits(string value)
-        {
-            if (string.IsNullOrEmpty(value))
-            {
-                return false;
-            }
-            foreach (var c in value)
-            {
-                if (c < '0' || c > '9')
-                {
-                    return false;
-                }
-            }
-            return true;
         }
     }
 }
