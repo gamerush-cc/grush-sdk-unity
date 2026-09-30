@@ -36,6 +36,7 @@ namespace GRushSdk
             get { return Backend.ProtocolVersion; }
         }
 
+        /// <summary>公開プレイヤー状態を呼べるか。古いランタイムでは false。</summary>
         public static bool IsPlayerStateAvailable
         {
             get { return IsAvailable && Backend.ProtocolVersion >= PlayerStateProtocolVersion; }

@@ -48,15 +48,15 @@ GameRush の確認シートが出て、プレイヤーが送り先を押した�
 ### 表示言語
 
 ```csharp
+GRush.Locale.Changed += locale => Debug.Log(locale.Locale);
 var result = await GRush.Locale.GetAsync();
 if (result.Ok)
 {
     var tag = result.Value.Locale;
 }
-GRush.Locale.Changed += locale => Debug.Log(locale.Locale);
 ```
 
-`GRushLocale` は `Locale`（BCP 47 のタグ。`ja` や `zh-Hans`）、`Source`（`user` / `system` / `device`）、`Languages`（優先順）を持つ。`GRush.Locale.Current` は取得済みなら同期で読め、無ければ `null`。`Changed` は次の `Update` で配られる。`GRush.IsLocaleAvailable` が `false`（`protocolVersion` 4 未満）では `GetAsync` が `Unsupported` を返す。
+`GRushLocale` は `Locale`（BCP 47 のタグ。`ja` や `zh-Hans`）、`Source`（`user` / `system` / `device`。今後増えても動くように書く）、`Languages`（優先順）を持つ。`GRush.Locale.Current` は取得済みなら同期で読め、無ければ `null`。`Changed` は次の `Update` で配られるので、取得の途中の変更を取りこぼさないよう `GetAsync` より先に購読する。`GRush.IsLocaleAvailable` が `false`（`protocolVersion` 4 未満）では `GetAsync` が `Unsupported` を返す。
 
 ## エディタでの動作確認
 

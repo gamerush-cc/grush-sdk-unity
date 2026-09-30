@@ -34,7 +34,10 @@ namespace GRushSdk
         {
             var tag = locale ?? FromSystemLanguage(Application.systemLanguage);
             var origin = locale == null ? "device" : source;
-            var list = languages != null && languages.Length > 0 ? languages : new[] { tag };
+            var device = FromSystemLanguage(Application.systemLanguage);
+            var list = languages != null && languages.Length > 0
+                ? languages
+                : locale == null || locale == device ? new[] { tag } : new[] { tag, device };
             var builder = new System.Text.StringBuilder();
             builder.Append("{\"locale\":").Append(GRushWire.Escape(tag));
             builder.Append(",\"source\":").Append(GRushWire.Escape(origin));
