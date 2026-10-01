@@ -79,6 +79,8 @@ namespace GRushSdk.Editor
         )
         {
             var request = new UnityWebRequest(url, "PUT");
+            // ファイルはディスクから流して送り、ファイル全体をメモリへ読み込まない。
+            // 再試行のたびにこのリクエストを作り直し、ディスクから読み直す。
             var upload = new UploadHandlerFile(filePath);
             upload.contentType = "application/octet-stream";
             request.uploadHandler = upload;

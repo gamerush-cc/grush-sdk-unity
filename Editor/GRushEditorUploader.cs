@@ -6,6 +6,8 @@ namespace GRushSdk.Editor
 {
     internal static class GRushEditorUploader
     {
+        // ビルドの presigned URL は一度きりの書き込みなので、
+        // 412 は前の試行が届いていた印として成功に扱う。
         private const long ObjectAlreadyWritten = 412;
         private const long SignatureRejected = 403;
 
