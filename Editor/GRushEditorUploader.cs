@@ -170,11 +170,23 @@ namespace GRushSdk.Editor
                 yield break;
             }
             var missing = GRushEditorUploadTickets.Requeue(state, slot.Result);
+            var message = slot.Result.Message();
+            if (GRushEditorCompleteFailure.RequiresNewBuild(slot.Result.Status, message, missing))
+            {
+                state.NeedsComplete = false;
+                Fail(
+                    state,
+                    "このビルドはもう確定できません（"
+                        + message
+                        + "）。『アップロードする』をもう一度押すと新しいビルドで送り直します。"
+                );
+                yield break;
+            }
             Fail(
                 state,
                 missing > 0
                     ? "R2 に届いていないファイルが " + missing + " 件ありました。再送してください。"
-                    : "ビルドの確定に失敗しました: " + slot.Result.Message()
+                    : "ビルドの確定に失敗しました: " + message
             );
         }
 
