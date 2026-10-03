@@ -148,19 +148,10 @@ namespace GRushSdk
         private GRushRpcResponse SetPlayerState(string paramsJson)
         {
             var payload = GRushWire.ExtractPayloadJson(paramsJson);
-            if (payload == null || !payload.TrimStart().StartsWith("{"))
+            var error = GRushMockPlayerStatePayload.Validate(payload);
+            if (error != null)
             {
-                return GRushRpcResponse.Failure(
-                    GRushErrorCode.InvalidParams,
-                    "Player state payload must be a JSON object."
-                );
-            }
-            if (payload.Length > 4096)
-            {
-                return GRushRpcResponse.Failure(
-                    GRushErrorCode.InvalidParams,
-                    "Player state payload is too large."
-                );
+                return GRushRpcResponse.Failure(GRushErrorCode.InvalidParams, error);
             }
             mockPlayerStateRevision += 1;
             mockPlayerState =
