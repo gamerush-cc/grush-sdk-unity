@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text;
 
 namespace GRushSdk
@@ -14,9 +15,6 @@ namespace GRushSdk
         public const string NotObjectMessage = "Player state payload must be a JSON object.";
         public const string TooLargeMessage = "Player state payload is too large.";
 
-        // 深い入れ子で再帰がスタックを使い切ると Editor ごと落ちるので、手前で JSON ではないものとして弾く。
-        private const int MaxDepth = 512;
-
         /// <summary>通るなら null、弾くならエラーの文言を返す。</summary>
         public static string Validate(string payloadJson)
         {
@@ -29,10 +27,11 @@ namespace GRushSdk
         }
 
         /// <summary>
-        /// <paramref name="json"/> が1つの JSON オブジェクトなら、値の外の空白を除いた
-        /// UTF-8 のバイト数を返す。サーバは payload を JSON.stringify し直して数えるので、
-        /// 作者が整形した JSON の空白は数えない。文字列のエスケープと数値の書き方は
-        /// そのまま数えるため、<c>あ</c> のような書き方ではサーバより多く数える。
+        /// <paramref name="json"/> が1つの JSON オブジェクトなら、サーバが payload を
+        /// JSON.stringify し直したときの UTF-8 のバイト数を見積もって返す。作者が整形した
+        /// JSON の空白は数えず、数値は JavaScript の数値の文字列化と同じ書き方に直して数える。
+        /// 文字列のエスケープは書いたまま数えるため、<c>\u3042</c> のような書き方では
+        /// サーバより多く数える（多く数える側の差は、実サーバで通る payload をモックで弾くだけ）。
         /// </summary>
         public static bool TryMeasureObject(string json, out long bytes)
         {
@@ -43,7 +42,7 @@ namespace GRushSdk
             }
             var scanner = new Scanner(json);
             scanner.SkipWhitespace();
-            if (scanner.Peek() != '{' || !scanner.Value(0))
+            if (scanner.Peek() != '{' || !scanner.Document())
             {
                 return false;
             }
@@ -54,6 +53,106 @@ namespace GRushSdk
             }
             bytes = scanner.Bytes;
             return true;
+        }
+
+        /// <summary>
+        /// 数値の字句（構文は確かめ済み）を、JavaScript の Number::toString が書く文字数に直す。
+        /// 有効数字が 15 桁までなら倍精度で正確に表せて、最短の書き方は字句の有効数字そのものになる。
+        /// 16 桁以上は丸めで桁数も指数も変わりうるので、17 桁で、指数が繰り上がった場合も含めた
+        /// 長いほうを返す（多く数える側に倒す）。
+        /// </summary>
+        internal static int NumberLength(string literal)
+        {
+            var index = 0;
+            var negative = literal[0] == '-';
+            if (negative)
+            {
+                index++;
+            }
+            var digits = new StringBuilder();
+            var point = 0;
+            while (index < literal.Length && literal[index] >= '0' && literal[index] <= '9')
+            {
+                digits.Append(literal[index]);
+                point++;
+                index++;
+            }
+            if (index < literal.Length && literal[index] == '.')
+            {
+                index++;
+                while (index < literal.Length && literal[index] >= '0' && literal[index] <= '9')
+                {
+                    digits.Append(literal[index]);
+                    index++;
+                }
+            }
+            long exponent = 0;
+            if (index < literal.Length && (literal[index] == 'e' || literal[index] == 'E'))
+            {
+                index++;
+                var exponentNegative = false;
+                if (literal[index] == '+' || literal[index] == '-')
+                {
+                    exponentNegative = literal[index] == '-';
+                    index++;
+                }
+                while (index < literal.Length)
+                {
+                    // 倍精度の範囲を大きく外れた指数は、どこで切っても桁数の見積もりに足りる。
+                    if (exponent < 1000000)
+                    {
+                        exponent = exponent * 10 + (literal[index] - '0');
+                    }
+                    index++;
+                }
+                if (exponentNegative)
+                {
+                    exponent = -exponent;
+                }
+            }
+
+            var text = digits.ToString();
+            var first = 0;
+            while (first < text.Length && text[first] == '0')
+            {
+                first++;
+            }
+            if (first == text.Length)
+            {
+                // 0 と -0 はどちらも "0" になる。
+                return 1;
+            }
+            var last = text.Length;
+            while (text[last - 1] == '0')
+            {
+                last--;
+            }
+            var k = last - first;
+            // 値は 0.d1d2…dk × 10^n。
+            var n = point - first + exponent;
+            var length = k <= 15
+                ? FormattedLength(k, n)
+                : System.Math.Max(FormattedLength(17, n), FormattedLength(17, n + 1));
+            return (negative ? 1 : 0) + length;
+        }
+
+        // ECMAScript の Number::toString(10) の書き方で、有効数字 k 桁・値 0.d1…dk × 10^n を書いた文字数。
+        private static int FormattedLength(int k, long n)
+        {
+            if (k <= n && n <= 21)
+            {
+                return (int)n;
+            }
+            if (0 < n && n <= 21)
+            {
+                return k + 1;
+            }
+            if (-6 < n && n <= 0)
+            {
+                return 2 + (int)-n + k;
+            }
+            var e = System.Math.Abs(n - 1);
+            return (k == 1 ? 1 : k + 1) + 2 + e.ToString().Length;
         }
 
         private sealed class Scanner
@@ -91,19 +190,89 @@ namespace GRushSdk
                 }
             }
 
-            public bool Value(int depth)
+            // 入れ子は再帰ではなく閉じ括弧の積み上げで追う。サーバは深さを制限しないので
+            // 深さでは弾かず、深い入れ子でも再帰がスタックを使い切って Editor ごと落ちない。
+            public bool Document()
             {
-                if (depth > MaxDepth)
+                var closers = new List<char>();
+                while (true)
+                {
+                    SkipWhitespace();
+                    var c = Peek();
+                    if (c == '{' || c == '[')
+                    {
+                        var close = c == '{' ? '}' : ']';
+                        Take(1);
+                        SkipWhitespace();
+                        if (Peek() == close)
+                        {
+                            Take(1);
+                        }
+                        else
+                        {
+                            closers.Add(close);
+                            if (close == '}' && !Key())
+                            {
+                                return false;
+                            }
+                            continue;
+                        }
+                    }
+                    else if (!Scalar(c))
+                    {
+                        return false;
+                    }
+
+                    // 値を1つ読み終えた。閉じられる入れ子を閉じ、次の要素へ進む。
+                    while (true)
+                    {
+                        if (closers.Count == 0)
+                        {
+                            return true;
+                        }
+                        SkipWhitespace();
+                        var top = closers[closers.Count - 1];
+                        var next = Peek();
+                        if (next == top)
+                        {
+                            Take(1);
+                            closers.RemoveAt(closers.Count - 1);
+                            continue;
+                        }
+                        if (next != ',')
+                        {
+                            return false;
+                        }
+                        Take(1);
+                        if (top == '}' && !Key())
+                        {
+                            return false;
+                        }
+                        break;
+                    }
+                }
+            }
+
+            private bool Key()
+            {
+                SkipWhitespace();
+                if (Peek() != '"' || !String())
                 {
                     return false;
                 }
                 SkipWhitespace();
-                switch (Peek())
+                if (Peek() != ':')
                 {
-                    case '{':
-                        return Container('}', depth, true);
-                    case '[':
-                        return Container(']', depth, false);
+                    return false;
+                }
+                Take(1);
+                return true;
+            }
+
+            private bool Scalar(char c)
+            {
+                switch (c)
+                {
                     case '"':
                         return String();
                     case 't':
@@ -114,50 +283,6 @@ namespace GRushSdk
                         return Literal("null");
                     default:
                         return Number();
-                }
-            }
-
-            private bool Container(char close, int depth, bool isObject)
-            {
-                Take(1);
-                SkipWhitespace();
-                if (Peek() == close)
-                {
-                    Take(1);
-                    return true;
-                }
-                while (true)
-                {
-                    if (isObject)
-                    {
-                        SkipWhitespace();
-                        if (Peek() != '"' || !String())
-                        {
-                            return false;
-                        }
-                        SkipWhitespace();
-                        if (Peek() != ':')
-                        {
-                            return false;
-                        }
-                        Take(1);
-                    }
-                    if (!Value(depth + 1))
-                    {
-                        return false;
-                    }
-                    SkipWhitespace();
-                    var next = Peek();
-                    if (next == close)
-                    {
-                        Take(1);
-                        return true;
-                    }
-                    if (next != ',')
-                    {
-                        return false;
-                    }
-                    Take(1);
                 }
             }
 
@@ -264,7 +389,7 @@ namespace GRushSdk
                         return false;
                     }
                 }
-                Bytes += position - start;
+                Bytes += NumberLength(text.Substring(start, position - start));
                 return true;
             }
 
