@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEditor;
 
 namespace GRushSdk.Editor
@@ -37,11 +36,10 @@ namespace GRushSdk.Editor
             }
 
             state.BuildId = slot.Result.Json.Get("build").Get("id").AsString(null);
-            state.Issued = GRushEditorUploadTickets.From(
+            state.Pending = GRushEditorUploadTickets.From(
                 slot.Result.Json.Get("uploadUrls"),
                 manifest
             );
-            state.Pending = new List<GRushUploadTicket>(state.Issued);
             state.NeedsComplete = true;
             if (string.IsNullOrEmpty(state.BuildId) || state.Pending.Count != manifest.Files.Count)
             {
@@ -169,25 +167,24 @@ namespace GRushSdk.Editor
                 state.Phase = "アップロードが終わりました。";
                 yield break;
             }
-            var missing = GRushEditorUploadTickets.Requeue(state, slot.Result);
             var message = slot.Result.Message();
-            if (GRushEditorCompleteFailure.RequiresNewBuild(slot.Result.Status, message, missing))
+            if (GRushEditorCompleteFailure.RequiresNewBuild(slot.Result.Status, message))
             {
+                // 中身の検査に落ちた 422 は、どのファイルかを params.path で返す。
+                var path = slot.Result.Json == null
+                    ? null
+                    : slot.Result.Json.Get("params").Get("path").AsString(null);
                 state.NeedsComplete = false;
                 Fail(
                     state,
                     "このビルドはもう確定できません（"
                         + message
+                        + (string.IsNullOrEmpty(path) ? "" : ": " + path)
                         + "）。『アップロードする』をもう一度押すと新しいビルドで送り直します。"
                 );
                 yield break;
             }
-            Fail(
-                state,
-                missing > 0
-                    ? "R2 に届いていないファイルが " + missing + " 件ありました。再送してください。"
-                    : "ビルドの確定に失敗しました: " + message
-            );
+            Fail(state, "ビルドの確定に失敗しました: " + message);
         }
 
         private static void FailCancelled(GRushUploadState state)

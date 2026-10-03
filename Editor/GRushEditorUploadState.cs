@@ -30,7 +30,6 @@ namespace GRushSdk.Editor
         public float FileProgress;
         public string CurrentPath = "";
         public List<GRushUploadTicket> Pending = new List<GRushUploadTicket>();
-        public List<GRushUploadTicket> Issued = new List<GRushUploadTicket>();
         public bool NeedsComplete;
 
         public float Progress =>
@@ -52,7 +51,6 @@ namespace GRushSdk.Editor
             FileProgress = 0f;
             CurrentPath = "";
             Pending.Clear();
-            Issued.Clear();
             NeedsComplete = false;
         }
     }
