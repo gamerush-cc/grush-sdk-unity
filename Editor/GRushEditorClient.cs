@@ -5,7 +5,7 @@ namespace GRushSdk.Editor
 {
     internal sealed class GRushEditorClient
     {
-        public const string ProductionOrigin = "https://gamerush.cc";
+        public const string ProductionOrigin = "https://gamerush.jp";
 
         public readonly string Origin;
         private readonly string token;
