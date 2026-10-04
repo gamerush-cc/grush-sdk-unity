@@ -7,6 +7,9 @@ namespace GRushSdk.Editor
     {
         public const string ProductionOrigin = "https://gamerush.jp";
 
+        // 以前の本番の接続先。いまは ProductionOrigin へ転送されるだけで、同じ API のトークンが使える。
+        private const string LegacyProductionOrigin = "https://gamerush.cc";
+
         public readonly string Origin;
         private readonly string token;
 
@@ -29,6 +32,14 @@ namespace GRushSdk.Editor
                 return ProductionOrigin;
             }
             return configured.TrimEnd('/');
+        }
+
+        /// <summary>
+        /// 以前の本番の接続先で保存したトークンを、ログインし直さずに使い続けるために読み替える。
+        /// </summary>
+        public static string CanonicalOrigin(string origin)
+        {
+            return origin == LegacyProductionOrigin ? ProductionOrigin : origin;
         }
 
         public IEnumerator Get(string path, GRushHttpSlot slot)

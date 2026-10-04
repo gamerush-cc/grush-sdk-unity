@@ -102,7 +102,7 @@ namespace GRushSdk.Editor
             }
             return new GRushCredentials
             {
-                Origin = json.Get("origin").AsString(null),
+                Origin = GRushEditorClient.CanonicalOrigin(json.Get("origin").AsString(null)),
                 Token = token,
                 Preview = json.Get("preview").AsString(""),
                 ClientName = json.Get("clientName").AsString(""),
