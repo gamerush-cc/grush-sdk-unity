@@ -158,6 +158,20 @@ namespace GRushSdk.Editor
             Section("新しいゲームを作る");
             newGameTitle = EditorGUILayout.TextField("タイトル", newGameTitle);
             newGameDescription = EditorGUILayout.TextField("説明", newGameDescription);
+            EditorGUILayout.LabelField("遊び方");
+            if (howToPlayStyle == null)
+            {
+                howToPlayStyle = new GUIStyle(EditorStyles.textArea) { wordWrap = true };
+            }
+            newGameHowToPlay = EditorGUILayout.TextArea(
+                newGameHowToPlay,
+                howToPlayStyle,
+                GUILayout.MinHeight(54)
+            );
+            EditorGUILayout.HelpBox(
+                "操作方法・ゲームの目的・攻略のコツなどを書いてください。最大 2000 字。ゲーム詳細にそのまま表示されます。",
+                MessageType.None
+            );
             newGameVisibility = EditorGUILayout.Popup(
                 "公開設定",
                 newGameVisibility,

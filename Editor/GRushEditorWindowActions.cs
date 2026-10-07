@@ -30,6 +30,7 @@ namespace GRushSdk.Editor
                 Client(),
                 newGameTitle.Trim(),
                 newGameDescription.Trim(),
+                newGameHowToPlay.Trim(),
                 VisibilityValues[newGameVisibility],
                 game => created = game,
                 message => error = message
@@ -40,6 +41,7 @@ namespace GRushSdk.Editor
             }
             newGameTitle = "";
             newGameDescription = "";
+            newGameHowToPlay = "";
             newGameConfirmRights = false;
             notice = created.Title + " を作りました。ビルドを上げてください。";
             yield return RefreshGames();

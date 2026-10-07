@@ -37,6 +37,9 @@ namespace GRushSdk.Editor
         private int selectedGame;
         private string newGameTitle = "";
         private string newGameDescription = "";
+        private string newGameHowToPlay = "";
+        // EditorStyles は OnGUI の中でしか読めないので、最初に描くときに作る。
+        private GUIStyle howToPlayStyle;
         private int newGameVisibility;
         private bool newGameConfirmRights;
         private string buildDirectory = "";

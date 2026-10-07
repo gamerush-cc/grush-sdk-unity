@@ -84,24 +84,40 @@ namespace GRushSdk.Editor
             onDone(games);
         }
 
-        public static IEnumerator CreateGame(
-            GRushEditorClient client,
+        // 空の説明と遊び方も送る。サーバが空を「未記入」として保存する。
+        internal static string CreateGameBody(
             string title,
             string description,
-            string visibility,
-            Action<GRushGameSummary> onDone,
-            Action<string> onError
+            string howToPlay,
+            string visibility
         )
         {
             var body = new StringBuilder("{");
             body.Append("\"title\":").Append(GRushJsonText.Escape(title));
             body.Append(",\"description\":").Append(GRushJsonText.Escape(description));
+            body.Append(",\"howToPlay\":").Append(GRushJsonText.Escape(howToPlay));
             body.Append(",\"visibility\":").Append(GRushJsonText.Escape(visibility));
             body.Append(",\"acceptTerms\":true");
             body.Append(",\"confirmAssetRights\":true}");
+            return body.ToString();
+        }
 
+        public static IEnumerator CreateGame(
+            GRushEditorClient client,
+            string title,
+            string description,
+            string howToPlay,
+            string visibility,
+            Action<GRushGameSummary> onDone,
+            Action<string> onError
+        )
+        {
             var slot = new GRushHttpSlot();
-            yield return client.Post("/api/games", body.ToString(), slot);
+            yield return client.Post(
+                "/api/games",
+                CreateGameBody(title, description, howToPlay, visibility),
+                slot
+            );
             var errorCode =
                 slot.Result.Json == null ? "" : slot.Result.Json.Get("code").AsString("");
             if (!slot.Result.Ok && errorCode == "rights.confirmRequired")
