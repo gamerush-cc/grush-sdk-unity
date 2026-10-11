@@ -58,16 +58,60 @@ namespace GRushSdk
             public bool Enabled;
         }
 
+        private static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(false, true);
+
+        /// <summary>
+        /// ファイルのバイト列を読む。GameRush と同じく、上限はバイト数で測り、UTF-8 として
+        /// 読めないバイト列は JSON として読めないものとして拒む。
+        /// </summary>
+        public static string ParseBytes(byte[] bytes, out List<Entry> entries)
+        {
+            entries = new List<Entry>();
+            if (bytes == null)
+            {
+                return NotObject();
+            }
+            if (bytes.Length > MaxBytes)
+            {
+                return TooLarge();
+            }
+            string text;
+            try
+            {
+                text = StrictUtf8.GetString(bytes);
+            }
+            catch (ArgumentException)
+            {
+                return NotObject();
+            }
+            return ParseText(text, out entries);
+        }
+
         /// <summary>読めたら null と定義の一覧を、読めなければエラーの文言を返す。</summary>
         public static string Parse(string json, out List<Entry> entries)
         {
             entries = new List<Entry>();
-            if (json != null && Encoding.UTF8.GetByteCount(json) > MaxBytes)
+            if (json == null)
             {
-                return FileName + " is too large (" + (MaxBytes / 1024) + "KB at most).";
+                return NotObject();
+            }
+            if (Encoding.UTF8.GetByteCount(json) > MaxBytes)
+            {
+                return TooLarge();
+            }
+            return ParseText(json, out entries);
+        }
+
+        private static string ParseText(string json, out List<Entry> entries)
+        {
+            entries = new List<Entry>();
+            // GameRush は UTF-8 として読むときに先頭の BOM を1つ外し、JSON として読む前にもう1つ外す。
+            for (var removed = 0; removed < 2 && json.Length > 0 && json[0] == '\uFEFF'; removed++)
+            {
+                json = json.Substring(1);
             }
             object parsed;
-            if (json == null || !Json.TryParse(json.TrimStart('\uFEFF'), out parsed))
+            if (!Json.TryParse(json, out parsed))
             {
                 return NotObject();
             }
@@ -103,23 +147,24 @@ namespace GRushSdk
             for (var index = 0; index < list.Count; index++)
             {
                 Entry entry;
-                var error = ReadEntry(list[index], "leaderboards[" + index + "]", out entry);
+                var error = ReadEntry(list[index], "leaderboards[" + index + "]", seen, out entry);
                 if (error != null)
                 {
                     entries.Clear();
                     return error;
-                }
-                if (!seen.Add(entry.Key))
-                {
-                    entries.Clear();
-                    return FileName + " declares the leaderboard key more than once: " + entry.Key;
                 }
                 entries.Add(entry);
             }
             return null;
         }
 
-        private static string ReadEntry(object value, string at, out Entry entry)
+        // GameRush と同じ順に確かめる。誤りが複数あっても、アップロードと同じ項目を返す。
+        private static string ReadEntry(
+            object value,
+            string at,
+            HashSet<string> seen,
+            out Entry entry
+        )
         {
             entry = null;
             var item = value as Json.Object;
@@ -139,6 +184,20 @@ namespace GRushSdk
             if (!IsKey(key))
             {
                 return Invalid(at + ".key");
+            }
+            if (!seen.Add(key))
+            {
+                return FileName + " declares the leaderboard key more than once: " + key;
+            }
+            double? min;
+            double? max;
+            if (!TryNumber(item, "minValue", out min))
+            {
+                return Invalid(at + ".minValue");
+            }
+            if (!TryNumber(item, "maxValue", out max))
+            {
+                return Invalid(at + ".maxValue");
             }
             var title = CollapseTitle(item.Get("title") as string);
             if (title.Length < 1 || title.Length > MaxTitleLength)
@@ -161,16 +220,6 @@ namespace GRushSdk
             if (item.TryGet("enabled", out enabled) && !(enabled is bool))
             {
                 return Invalid(at + ".enabled");
-            }
-            double? min;
-            double? max;
-            if (!TryNumber(item, "minValue", out min))
-            {
-                return Invalid(at + ".minValue");
-            }
-            if (!TryNumber(item, "maxValue", out max))
-            {
-                return Invalid(at + ".maxValue");
             }
             if (min.HasValue != max.HasValue || (min.HasValue && min.Value >= max.Value))
             {
@@ -233,6 +282,7 @@ namespace GRushSdk
         }
 
         // 改行と制御文字を空白にしてから前後を詰める。GameRush が保存するタイトルと同じ形にする。
+        // 長さは GameRush と同じく UTF-16 の単位で測るので、string.Length をそのまま使える。
         private static string CollapseTitle(string title)
         {
             if (title == null)
@@ -261,7 +311,36 @@ namespace GRushSdk
                 inRun = false;
                 builder.Append(c);
             }
-            return builder.ToString().Trim();
+            var start = 0;
+            var end = builder.Length;
+            while (start < end && IsTrimmed(builder[start]))
+            {
+                start++;
+            }
+            while (end > start && IsTrimmed(builder[end - 1]))
+            {
+                end--;
+            }
+            return builder.ToString(start, end - start);
+        }
+
+        // GameRush の trim が外す空白（ECMAScript の WhiteSpace と LineTerminator）。string.Trim は
+        // U+FEFF を外さず U+0085 を外すので使わない。制御文字と行の区切りは先に空白へ潰してある。
+        private static bool IsTrimmed(char c)
+        {
+            return c == ' '
+                || c == '\u00A0'
+                || c == '\u1680'
+                || (c >= '\u2000' && c <= '\u200A')
+                || c == '\u202F'
+                || c == '\u205F'
+                || c == '\u3000'
+                || c == '\uFEFF';
+        }
+
+        private static string TooLarge()
+        {
+            return FileName + " is too large (" + (MaxBytes / 1024) + "KB at most).";
         }
 
         private static string NotObject()

@@ -25,6 +25,9 @@ namespace GRushSdk.Editor
         public string Error;
         public string BuildId;
         public string EntryUrl;
+
+        // 確定したビルドの grush.json のうち、書けなかった定義の案内。無ければ null。
+        public string LeaderboardWarning;
         public long TotalBytes;
         public long UploadedBytes;
         public float FileProgress;
@@ -46,6 +49,7 @@ namespace GRushSdk.Editor
             Error = null;
             BuildId = null;
             EntryUrl = null;
+            LeaderboardWarning = null;
             TotalBytes = 0;
             UploadedBytes = 0;
             FileProgress = 0f;

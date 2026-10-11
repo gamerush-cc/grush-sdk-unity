@@ -116,6 +116,10 @@ namespace GRushSdk.Editor
                 {
                     EditorGUILayout.SelectableLabel(upload.EntryUrl, GUILayout.Height(18));
                 }
+                if (upload.LeaderboardWarning != null)
+                {
+                    EditorGUILayout.HelpBox(upload.LeaderboardWarning, MessageType.Warning);
+                }
             }
         }
 

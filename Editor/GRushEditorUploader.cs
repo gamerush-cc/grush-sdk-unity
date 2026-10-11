@@ -161,6 +161,13 @@ namespace GRushSdk.Editor
                 state.EntryUrl = slot.Result.Json == null
                     ? null
                     : slot.Result.Json.Get("entryUrl").AsString(null);
+                state.LeaderboardWarning = GRushEditorCompleteLeaderboards.FailedMessage(
+                    slot.Result.Json
+                );
+                if (state.LeaderboardWarning != null)
+                {
+                    UnityEngine.Debug.LogWarning("[GRush] " + state.LeaderboardWarning);
+                }
                 state.NeedsComplete = false;
                 state.Running = false;
                 state.Done = true;

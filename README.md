@@ -86,8 +86,8 @@ opponent.Received += message => opponent.Send(reply, GRushChannel.Unreliable, GR
 ランキングの定義は、プロジェクトの直下（`Assets/` の隣）の `grush.json` に書ける。書式は [SDK ガイドのランキング](https://gamerush.jp/sdk#leaderboards)。
 
 - エディタのモックは、最初のランキングの呼び出しの前にこのファイルを読み、その枠を宣言する。ファイルが無ければ何もしない。書式の誤りはアップロードと同じ文言で Console に警告し、その中身は使わない
-- WebGL でビルドすると、このファイルがビルドの最上位（`index.html` の隣）へ写る。GameRush はアップロードされたビルドの最上位の `grush.json` だけを読むので、`Assets/` や `StreamingAssets/` に置いても定義にならない
-- `GRushMockLeaderboards.Define` で同じ key を宣言してあれば、そちらを使う。`GRushMockLeaderboards.LoadManifest(json)` に中身を渡すと、ファイルは自動では読まない。`LoadManifest` は誤りを `InvalidParams` で返す
+- WebGL でビルドすると、このファイルがビルドの最上位（`index.html` の隣）へ写る。ファイルが無いときは、前回写した `grush.json` を出力先から消す。GameRush はアップロードされたビルドの最上位の `grush.json` だけを読むので、`Assets/` や `StreamingAssets/` に置いても定義にならない
+- ファイルを自動で読むときは、`GRushMockLeaderboards.Define` で同じ key を宣言してあればそちらを使う。`GRushMockLeaderboards.LoadManifest(json)` に渡した定義は、`Define` の宣言を置き換える。`LoadManifest` を呼ぶと、ファイルは自動では読まない。`LoadManifest` は誤りを `InvalidParams` で返す
 - `enabled: false` の枠は一覧に出ず、投稿と取得は宣言していない key と同じく `InvalidParams` になる。`minValue` / `maxValue` の無い枠は、GameRush と同じく投稿を受けない
 - `period` が `daily` / `weekly` / `monthly` の枠は、GameRush と同じ期間キー（UTC）を返し、期間が変わると空からやり直す
 - `GRushMockLeaderboards.Reset()` の後は、次のランキングの呼び出しでファイルを読み直す

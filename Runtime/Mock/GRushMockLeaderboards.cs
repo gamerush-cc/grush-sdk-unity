@@ -58,7 +58,8 @@ namespace GRushSdk
 
         /// <summary>
         /// エディタで使うランキング枠を宣言する。実環境では Studio か grush.json が持つ役割。
-        /// 同じ key が grush.json にあっても、こちらの宣言を使う。
+        /// プロジェクトの直下の grush.json を自動で読むときは、同じ key をこちらで宣言してあれば
+        /// こちらを使う。<see cref="LoadManifest"/> に渡した定義は、こちらの宣言を置き換える。
         /// <paramref name="period"/> は <c>all_time</c> / <c>daily</c> / <c>weekly</c> /
         /// <c>monthly</c>。<paramref name="enabled"/> が false の枠は、宣言していない key と同じく
         /// 投稿と取得が <see cref="GRushErrorCode.InvalidParams"/> になる。
@@ -94,7 +95,8 @@ namespace GRushSdk
         /// <summary>
         /// grush.json の中身（JSON の文字列）で枠を宣言し、宣言した key を返す。アップロードと
         /// 同じ規則で読み、誤りは <see cref="GRushErrorCode.InvalidParams"/> とアップロードと同じ
-        /// 文言で返す。これを呼ぶと、プロジェクトの直下の grush.json は自動では読まない。
+        /// 文言で返す。同じ key を <see cref="Define"/> で宣言してあっても、こちらの定義で置き換える。
+        /// これを呼ぶと、プロジェクトの直下の grush.json は自動では読まない。
         /// </summary>
         public static GRushResult<string[]> LoadManifest(string json)
         {
@@ -152,7 +154,9 @@ namespace GRushSdk
             }
             manifestRead = true;
 #if UNITY_EDITOR
-            string json;
+            // 文字列で読むと、UTF-16 の BOM のファイルや UTF-8 でないバイト列も通り、上限も文字数で
+            // 測ることになる。GameRush と同じくバイト列のまま確かめる。
+            byte[] bytes;
             try
             {
                 var path = Path.Combine(
@@ -163,7 +167,7 @@ namespace GRushSdk
                 {
                     return;
                 }
-                json = File.ReadAllText(path);
+                bytes = File.ReadAllBytes(path);
             }
             catch (Exception failure)
             {
@@ -171,7 +175,7 @@ namespace GRushSdk
                 return;
             }
             List<GRushMockManifest.Entry> entries;
-            var error = GRushMockManifest.Parse(json, out entries);
+            var error = GRushMockManifest.ParseBytes(bytes, out entries);
             if (error != null)
             {
                 Debug.LogWarning("[GRushMock] " + error);
