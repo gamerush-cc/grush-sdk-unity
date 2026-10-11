@@ -3,7 +3,11 @@ using UnityEngine;
 
 namespace GRushSdk
 {
-    public sealed class GRushMockBackend : IGRushBackend, IGRushShareBackend, IGRushLocaleBackend
+    public sealed class GRushMockBackend
+        : IGRushBackend,
+            IGRushShareBackend,
+            IGRushLocaleBackend,
+            IGRushAnalyticsBackend
     {
         private const string PseudoIdKey = "grush.mock.pseudoId";
         private const string ConsentKey = "grush.mock.profileConsent";
@@ -19,7 +23,17 @@ namespace GRushSdk
 
         public int ProtocolVersion
         {
-            get { return GRush.LocaleProtocolVersion; }
+            get { return GRush.AnalyticsProtocolVersion; }
+        }
+
+        public bool IsAnalyticsAvailable
+        {
+            get { return true; }
+        }
+
+        public bool LogAnalytics(GRushAnalyticsEvent analyticsEvent)
+        {
+            return GRushMockAnalytics.Record(analyticsEvent);
         }
 
         public void Call(string method, string paramsJson, Action<GRushRpcResponse> onDone)

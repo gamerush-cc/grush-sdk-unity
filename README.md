@@ -7,7 +7,7 @@ GameRush の GameAPI を Unity から呼ぶための UPM パッケージ。ビ�
 Package Manager の `Add package from git URL...` に次を入れる。
 
 ```text
-https://github.com/gamerush-cc/grush-sdk-unity.git#v1.4.0
+https://github.com/gamerush-cc/grush-sdk-unity.git#v1.5.0
 ```
 
 Unity 2021.3 以降。ビルドターゲットは WebGL。
@@ -32,7 +32,7 @@ if (joined.Ok)
 }
 ```
 
-`GRush` は例外を投げない。GameRush の外で動かした場合も `GRushResult<T>.Ok` が `false`、`Code` が `GRushErrorCode.Unsupported` になるだけで、ゲームは止まらない。
+`GRush` は例外を投げない。GameRush の外で動かした場合も `GRushResult<T>.Ok` が `false`、`Code` が `GRushErrorCode.Unsupported` になるだけで、ゲームは止まらない（アナリティクスは `bool` を返す。下記）。
 
 ### 共有
 
@@ -58,6 +58,38 @@ if (result.Ok)
 
 `GRushLocale` は `Locale`（BCP 47 のタグ。`ja` や `zh-Hans`）、`Source`（`user` / `system` / `device`。今後増えても動くように書く）、`Languages`（優先順）を持つ。`GRush.Locale.Current` は取得済みなら同期で読め、無ければ `null`。`Changed` は次の `Update` で配られるので、取得の途中の変更を取りこぼさないよう `GetAsync` より先に購読する。`GRush.IsLocaleAvailable` が `false`（`protocolVersion` 4 未満）では `GetAsync` が `Unsupported` を返す。
 
+### アナリティクス
+
+```csharp
+GRush.Analytics.LogOnboardingStep(1, "tutorial_start");
+GRush.Analytics.LogFunnelStep("shop", "visit-1", 2, "item_selected");
+GRush.Analytics.LogCustomEvent(
+    "boss_defeated",
+    1,
+    new Dictionary<string, string> { { "stage", "3" } }
+);
+GRush.Analytics.LogEconomyEvent(
+    GRushEconomyFlowType.Sink,
+    "coin",
+    50,
+    120,
+    GRushEconomyTransactionType.Shop,
+    itemSku: "sword"
+);
+```
+
+作者のアナリティクスへ、オンボーディングとファネルのステップ・カスタムイベント・通貨の入手と消費を送る。
+
+- **ほかの API と違い、どれも同期で `bool` を返し、例外を投げない。** `await` せずにどこからでも呼べる。`true` は GameRush へ渡したことで、保存されたことではない
+- 形が不正なとき（下の制限）は `false`。古い GameRush（`protocolVersion` 6 未満。`GRush.IsAnalyticsAvailable` が `false`）と GameRush の外では `false`。`GRush.Analytics.IsAvailable` は GameRush の中で送れるかを返す
+- `step` は 1〜100。`value` は省略で 1、絶対値 1e9 まで。`amount` は正の値で 1e12 まで、`endingBalance`（その後の残高）は絶対値 1e15 まで
+- `transactionType` の標準の値は `GRushEconomyTransactionType` の定数で、ほかの文字列も受ける
+- イベント名・ファネル名・`funnelSessionId` は英数字と `._:-` で 64 文字まで、通貨と `transactionType` は 32 文字まで
+- `stepName`・`itemSku`・`fields` の値は1行のテキストで 40 文字（コードポイント）まで。改行と制御文字は空白に直してから数える。`fields` は3つまで、キーは英数字と `_` で 32 文字まで
+- ファネルの同じステップは、1回のプレイで最初の1回だけが残る。同じファネルを何度も通るなら、通るたびに別の `funnelSessionId` を渡す
+- 名前・値・`fields` に、プレイヤーを識別できる情報を入れない
+- GameRush の中でも、ゲームが前面に出るまでの分は溜めてから送る。溜められるのは 30 件までで、超えた分は `false`
+
 ## エディタでの動作確認
 
 WebGL 以外（エディタ・スタンドアロン）では自動的に `GRushMockBackend` が使われる。`GRushMock` で挙動を切り替える。
@@ -78,6 +110,8 @@ opponent.Received += message => opponent.Send(reply, GRushChannel.Unreliable, GR
 表示言語のモックは `GRushMock.SetLocale("en")`（`Source` は `user`）で切り替わり、`Changed` が飛ぶ。未設定なら `Application.systemLanguage` から写した値を `Source = "device"` で返す。
 
 共有のモックは確認シートを出さず、`GRushMock.ShareStatus`（既定 `Opened`）を返す。`GRushMock.ShareAvailable = false` で共有できない環境を試せる。本文と画像の検査はしない。
+
+アナリティクスのモックは、GameRush と同じ検査をして、通ったイベントを1件ずつ Console に出し、直近の 200 件を `GRushMock.AnalyticsEvents`（GameRush へ渡すのと同じ形の JSON の配列）で返す（`GRushMock.Reset()` で空になる）。弾いたイベントは理由を警告する。どこへも送らない。モックが名乗る `protocolVersion` は 6。
 
 **`UnreliableDropRate` は既定 0 だが、出荷前に必ず 0 より大きくして試すこと。** WebSocket 中継では `unreliable` も落ちずに届くため、パケットが落ちる前提で書けているかを確認できる場所はエディタのモックだけになる。
 

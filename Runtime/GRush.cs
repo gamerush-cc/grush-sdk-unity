@@ -9,6 +9,7 @@ namespace GRushSdk
         public const int PlayerStateProtocolVersion = 2;
         public const int ShareProtocolVersion = 3;
         public const int LocaleProtocolVersion = 4;
+        public const int AnalyticsProtocolVersion = 6;
         public const int MaxMessageBytes = 8 * 1024;
 
         private static IGRushBackend backend;
@@ -18,6 +19,7 @@ namespace GRushSdk
         private static GRushPlayerStateApi playerState;
         private static GRushShareApi share;
         private static GRushLocaleApi locale;
+        private static GRushAnalyticsApi analytics;
 
         public static IGRushBackend Backend
         {
@@ -50,6 +52,12 @@ namespace GRushSdk
         public static bool IsLocaleAvailable
         {
             get { return IsAvailable && Backend.ProtocolVersion >= LocaleProtocolVersion; }
+        }
+
+        /// <summary>分析イベントに要る版数を GameRush が満たすか。GameRush の中で動いているかは Analytics.IsAvailable。</summary>
+        public static bool IsAnalyticsAvailable
+        {
+            get { return IsAvailable && Backend.ProtocolVersion >= AnalyticsProtocolVersion; }
         }
 
         public static bool IsAvailable
@@ -129,6 +137,19 @@ namespace GRushSdk
             }
         }
 
+        /// <summary>作者のアナリティクスへ送るイベント。どれも同期で bool を返す。</summary>
+        public static GRushAnalyticsApi Analytics
+        {
+            get
+            {
+                if (analytics == null)
+                {
+                    analytics = new GRushAnalyticsApi();
+                }
+                return analytics;
+            }
+        }
+
         public static void UseBackend(IGRushBackend replacement)
         {
             var previous = backend as IGRushLocaleBackend;
@@ -142,6 +163,7 @@ namespace GRushSdk
             playerState = null;
             share = null;
             locale = null;
+            analytics = null;
             backend = replacement ?? GRushBackendFactory.Create();
         }
 
