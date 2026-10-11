@@ -12,6 +12,7 @@ namespace GRushSdk.Editor
             "TemplateData",
             "StreamingAssets",
             "index.html",
+            GRushEditorLeaderboardManifest.FileName,
         };
 
         private static readonly string[] ProtectedFolders =

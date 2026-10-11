@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Text;
+using UnityEngine;
 
 namespace GRushSdk
 {
@@ -13,6 +15,10 @@ namespace GRushSdk
     /// 実サーバ側の縛り（値域・自己ベスト集約・自己申告であること）は同じ形で
     /// 再現する。session 束縛と有効プレイ 10 秒はエディタでは意味を持たない
     /// ので省く。
+    ///
+    /// エディタでは、プロジェクトの直下（Assets の隣）に grush.json があれば、
+    /// 最初のランキングの呼び出しの前に読んで枠を宣言する。WebGL ビルドでは同じ
+    /// ファイルがビルドの最上位へ写るので、アップロードと手元の確認で同じ定義を使える。
     /// </summary>
     public static class GRushMockLeaderboards
     {
@@ -34,15 +40,28 @@ namespace GRushSdk
             public string ValueType = "int";
             public string Aggregation = "best";
             public string Period = "all_time";
-            public double MinValue;
-            public double MaxValue = 1000000;
-            public readonly List<Entry> Entries = new List<Entry>();
+            public double? MinValue;
+            public double? MaxValue;
+            public bool Enabled = true;
+
+            // grush.json から読んだ枠。GameRush は値域の無い枠への投稿を受けないので、それに合わせる。
+            public bool RequireRange;
+            public string PeriodKey = "";
+            public List<Entry> Entries = new List<Entry>();
         }
 
+        /// <summary>モックが読む、ビルドの最上位に置くランキングの定義のファイル名。</summary>
+        public const string ManifestFileName = GRushMockManifest.FileName;
+
         private static readonly Dictionary<string, Board> boards = new Dictionary<string, Board>();
+        private static bool manifestRead;
 
         /// <summary>
-        /// エディタで使うランキング枠を宣言する。実環境では Studio が持つ役割。
+        /// エディタで使うランキング枠を宣言する。実環境では Studio か grush.json が持つ役割。
+        /// 同じ key が grush.json にあっても、こちらの宣言を使う。
+        /// <paramref name="period"/> は <c>all_time</c> / <c>daily</c> / <c>weekly</c> /
+        /// <c>monthly</c>。<paramref name="enabled"/> が false の枠は、宣言していない key と同じく
+        /// 投稿と取得が <see cref="GRushErrorCode.InvalidParams"/> になる。
         /// </summary>
         public static void Define(
             string key,
@@ -51,19 +70,172 @@ namespace GRushSdk
             string valueType = "int",
             string aggregation = "best",
             double minValue = 0,
-            double maxValue = 1000000
+            double maxValue = 1000000,
+            string period = "all_time",
+            bool enabled = true
         )
         {
-            boards[key] = new Board
+            Put(
+                new Board
+                {
+                    Key = key,
+                    Title = string.IsNullOrEmpty(title) ? key : title,
+                    Sort = sort,
+                    ValueType = valueType,
+                    Aggregation = aggregation,
+                    Period = string.IsNullOrEmpty(period) ? "all_time" : period,
+                    MinValue = minValue,
+                    MaxValue = maxValue,
+                    Enabled = enabled,
+                }
+            );
+        }
+
+        /// <summary>
+        /// grush.json の中身（JSON の文字列）で枠を宣言し、宣言した key を返す。アップロードと
+        /// 同じ規則で読み、誤りは <see cref="GRushErrorCode.InvalidParams"/> とアップロードと同じ
+        /// 文言で返す。これを呼ぶと、プロジェクトの直下の grush.json は自動では読まない。
+        /// </summary>
+        public static GRushResult<string[]> LoadManifest(string json)
+        {
+            manifestRead = true;
+            List<GRushMockManifest.Entry> entries;
+            var error = GRushMockManifest.Parse(json, out entries);
+            if (error != null)
             {
-                Key = key,
-                Title = string.IsNullOrEmpty(title) ? key : title,
-                Sort = sort,
-                ValueType = valueType,
-                Aggregation = aggregation,
-                MinValue = minValue,
-                MaxValue = maxValue,
-            };
+                return GRushResult<string[]>.Failure(GRushErrorCode.InvalidParams, error);
+            }
+            return GRushResult<string[]>.Success(Apply(entries, false).ToArray());
+        }
+
+        private static List<string> Apply(List<GRushMockManifest.Entry> entries, bool keepDefined)
+        {
+            var defined = new List<string>();
+            foreach (var entry in entries)
+            {
+                if (keepDefined && boards.ContainsKey(entry.Key))
+                {
+                    continue;
+                }
+                Put(
+                    new Board
+                    {
+                        Key = entry.Key,
+                        Title = entry.Title,
+                        Sort = entry.Sort,
+                        ValueType = entry.ValueType,
+                        Aggregation = entry.Aggregation,
+                        Period = entry.Period,
+                        MinValue = entry.MinValue,
+                        MaxValue = entry.MaxValue,
+                        Enabled = entry.Enabled,
+                        RequireRange = true,
+                    }
+                );
+                defined.Add(entry.Key);
+            }
+            return defined;
+        }
+
+        private static void Put(Board board)
+        {
+            board.PeriodKey = PeriodKeyOf(board.Period, DateTime.UtcNow);
+            boards[board.Key] = board;
+        }
+
+        // エディタでだけ、プロジェクトの直下の grush.json を一度読む。無ければ何もしない。
+        private static void EnsureManifest()
+        {
+            if (manifestRead)
+            {
+                return;
+            }
+            manifestRead = true;
+#if UNITY_EDITOR
+            string json;
+            try
+            {
+                var path = Path.Combine(
+                    Path.GetDirectoryName(Application.dataPath) ?? "",
+                    ManifestFileName
+                );
+                if (!File.Exists(path))
+                {
+                    return;
+                }
+                json = File.ReadAllText(path);
+            }
+            catch (Exception failure)
+            {
+                Debug.LogWarning("[GRushMock] " + ManifestFileName + " を読めません: " + failure.Message);
+                return;
+            }
+            List<GRushMockManifest.Entry> entries;
+            var error = GRushMockManifest.Parse(json, out entries);
+            if (error != null)
+            {
+                Debug.LogWarning("[GRushMock] " + error);
+                return;
+            }
+            Apply(entries, true);
+#endif
+        }
+
+        // GameRush と同じ期間キー（UTC）。キーが変わったら、新しい期間として空からやり直す。
+        internal static string PeriodKeyOf(string period, DateTime utc)
+        {
+            switch (period)
+            {
+                case "daily":
+                    return utc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                case "monthly":
+                    return utc.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+                case "weekly":
+                    var date = utc.Date;
+                    var day = date.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)date.DayOfWeek;
+                    var thursday = date.AddDays(4 - day);
+                    var week = (thursday.DayOfYear - 1) / 7 + 1;
+                    return thursday.Year.ToString(CultureInfo.InvariantCulture)
+                        + "-W"
+                        + week.ToString("00", CultureInfo.InvariantCulture);
+                default:
+                    return "";
+            }
+        }
+
+        private static Board Current(Board board)
+        {
+            var key = PeriodKeyOf(board.Period, DateTime.UtcNow);
+            if (key != board.PeriodKey)
+            {
+                board.PeriodKey = key;
+                board.Entries = new List<Entry>();
+            }
+            return board;
+        }
+
+        // GameRush は宣言していない key と止めた枠を同じく 404 で返す。
+        private static GRushRpcResponse? Playable(string key, out Board board)
+        {
+            EnsureManifest();
+            if (!boards.TryGetValue(key, out board))
+            {
+                return GRushRpcResponse.Failure(
+                    GRushErrorCode.InvalidParams,
+                    "No mock leaderboard named "
+                        + key
+                        + ". Declare it in grush.json or call GRushMockLeaderboards.Define first."
+                );
+            }
+            if (!board.Enabled)
+            {
+                return GRushRpcResponse.Failure(
+                    GRushErrorCode.InvalidParams,
+                    "The mock leaderboard " + key + " is disabled."
+                );
+            }
+            Current(board);
+            return null;
         }
 
         /// <summary>他プレイヤーの行を積む。順位表示や同意の出し分けの確認に使う。</summary>
@@ -75,7 +247,7 @@ namespace GRushSdk
             bool isGuest = false
         )
         {
-            var board = Ensure(key);
+            var board = Current(Ensure(key));
             board.Entries.Add(
                 new Entry
                 {
@@ -89,18 +261,29 @@ namespace GRushSdk
             );
         }
 
+        /// <summary>
+        /// 宣言した枠をすべて消す。次のランキングの呼び出しで、grush.json を読み直す。
+        /// </summary>
         public static void Reset()
         {
             boards.Clear();
+            manifestRead = false;
         }
 
         private static Board Ensure(string key)
         {
+            EnsureManifest();
             Board board;
             if (!boards.TryGetValue(key, out board))
             {
-                board = new Board { Key = key, Title = key };
-                boards[key] = board;
+                board = new Board
+                {
+                    Key = key,
+                    Title = key,
+                    MinValue = 0,
+                    MaxValue = 1000000,
+                };
+                Put(board);
             }
             return board;
         }
@@ -115,10 +298,15 @@ namespace GRushSdk
 
         internal static string ListJson()
         {
+            EnsureManifest();
             var builder = new StringBuilder("{\"leaderboards\":[");
             var first = true;
             foreach (var board in boards.Values)
             {
+                if (!board.Enabled)
+                {
+                    continue;
+                }
                 if (!first)
                 {
                     builder.Append(',');
@@ -141,14 +329,22 @@ namespace GRushSdk
         internal static GRushRpcResponse Submit(string key, double value, string selfPseudoId)
         {
             Board board;
-            if (!boards.TryGetValue(key, out board))
+            var unavailable = Playable(key, out board);
+            if (unavailable.HasValue)
+            {
+                return unavailable.Value;
+            }
+            if (board.RequireRange && !board.MinValue.HasValue)
             {
                 return GRushRpcResponse.Failure(
                     GRushErrorCode.InvalidParams,
-                    "No mock leaderboard named " + key + ". Call GRushMockLeaderboards.Define first."
+                    "This leaderboard declares no minValue / maxValue, so it accepts no score."
                 );
             }
-            if (value < board.MinValue || value > board.MaxValue)
+            if (
+                (board.MinValue.HasValue && value < board.MinValue.Value)
+                || (board.MaxValue.HasValue && value > board.MaxValue.Value)
+            )
             {
                 return GRushRpcResponse.Failure(
                     GRushErrorCode.InvalidParams,
@@ -208,12 +404,10 @@ namespace GRushSdk
         internal static GRushRpcResponse Page(string key, int limit, int offset, bool aroundMe)
         {
             Board board;
-            if (!boards.TryGetValue(key, out board))
+            var unavailable = Playable(key, out board);
+            if (unavailable.HasValue)
             {
-                return GRushRpcResponse.Failure(
-                    GRushErrorCode.InvalidParams,
-                    "No mock leaderboard named " + key + ". Call GRushMockLeaderboards.Define first."
-                );
+                return unavailable.Value;
             }
 
             var ranked = Ranked(board);
@@ -258,7 +452,7 @@ namespace GRushSdk
             builder.Append(",\"sort\":").Append(GRushWire.Escape(board.Sort));
             builder.Append(",\"valueType\":").Append(GRushWire.Escape(board.ValueType));
             builder.Append(",\"period\":").Append(GRushWire.Escape(board.Period));
-            builder.Append(",\"periodKey\":\"\"");
+            builder.Append(",\"periodKey\":").Append(GRushWire.Escape(board.PeriodKey));
             builder.Append(",\"verified\":false");
             builder.Append(",\"total\":").Append(total);
             builder.Append(",\"entries\":[");
@@ -285,6 +479,11 @@ namespace GRushSdk
                 builder.Append('}');
             }
             return builder.Append("]}}").ToString();
+        }
+
+        private static string Num(double? value)
+        {
+            return value.HasValue ? Num(value.Value) : "null";
         }
 
         private static string Num(double value)

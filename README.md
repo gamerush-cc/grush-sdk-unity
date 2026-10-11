@@ -7,7 +7,7 @@ GameRush の GameAPI を Unity から呼ぶための UPM パッケージ。ビ�
 Package Manager の `Add package from git URL...` に次を入れる。
 
 ```text
-https://github.com/gamerush-cc/grush-sdk-unity.git#v1.3.0
+https://github.com/gamerush-cc/grush-sdk-unity.git#v1.4.0
 ```
 
 Unity 2021.3 以降。ビルドターゲットは WebGL。
@@ -81,12 +81,24 @@ opponent.Received += message => opponent.Send(reply, GRushChannel.Unreliable, GR
 
 **`UnreliableDropRate` は既定 0 だが、出荷前に必ず 0 より大きくして試すこと。** WebSocket 中継では `unreliable` も落ちずに届くため、パケットが落ちる前提で書けているかを確認できる場所はエディタのモックだけになる。
 
+### grush.json をモックで使う
+
+ランキングの定義は、プロジェクトの直下（`Assets/` の隣）の `grush.json` に書ける。書式は [SDK ガイドのランキング](https://gamerush.jp/sdk#leaderboards)。
+
+- エディタのモックは、最初のランキングの呼び出しの前にこのファイルを読み、その枠を宣言する。ファイルが無ければ何もしない。書式の誤りはアップロードと同じ文言で Console に警告し、その中身は使わない
+- WebGL でビルドすると、このファイルがビルドの最上位（`index.html` の隣）へ写る。GameRush はアップロードされたビルドの最上位の `grush.json` だけを読むので、`Assets/` や `StreamingAssets/` に置いても定義にならない
+- `GRushMockLeaderboards.Define` で同じ key を宣言してあれば、そちらを使う。`GRushMockLeaderboards.LoadManifest(json)` に中身を渡すと、ファイルは自動では読まない。`LoadManifest` は誤りを `InvalidParams` で返す
+- `enabled: false` の枠は一覧に出ず、投稿と取得は宣言していない key と同じく `InvalidParams` になる。`minValue` / `maxValue` の無い枠は、GameRush と同じく投稿を受けない
+- `period` が `daily` / `weekly` / `monthly` の枠は、GameRush と同じ期間キー（UTC）を返し、期間が変わると空からやり直す
+- `GRushMockLeaderboards.Reset()` の後は、次のランキングの呼び出しでファイルを読み直す
+
 ## 推奨設定でビルド
 
 メニューの `GameRush/GameRush ウィンドウ` を開くと、先頭に「推奨設定でビルド」が出る。ログインしなくても使える。WebGL の設定ごとに、いまの値・推奨値・合っているか（✓ / ✗）を一覧にする。
 
 - **推奨設定を適用**: ✗ の項目だけを推奨値へ変える。変えた設定は元に戻さない（`GameRush/推奨設定を適用` からも同じ）。
-- **推奨設定でビルド**: 設定を適用してから、Build Settings で有効なシーンを WebGL でビルドする（`GameRush/推奨設定でビルド` からも同じ）。出力先は既定で `<プロジェクト>/Build/GameRush`。**出力先のフォルダはビルドのたびに消して作り直す**ので、プロジェクトのフォルダそのものや `Assets/` `Packages/` `ProjectSettings/` `Library/` の中は選べない。既にあるフォルダは、中身が `Build/` `TemplateData/` `StreamingAssets/` `index.html` だけか空のときに限って消す。
+- **推奨設定でビルド**: 設定を適用してから、Build Settings で有効なシーンを WebGL でビルドする（`GameRush/推奨設定でビルド` からも同じ）。出力先は既定で `<プロジェクト>/Build/GameRush`。**出力先のフォルダはビルドのたびに消して作り直す**ので、プロジェクトのフォルダそのものや `Assets/` `Packages/` `ProjectSettings/` `Library/` の中は選べない。既にあるフォルダは、中身が `Build/` `TemplateData/` `StreamingAssets/` `index.html` `grush.json` だけか空のときに限って消す。
+- プロジェクトの直下に `grush.json` があれば、WebGL のビルドのたびに出力先の最上位へ写す（このウィンドウ以外からの WebGL ビルドでも写す）。
 - ビルドが通ると、その出力先が「ビルドをアップロード」に入った状態になる。ログインしていればそのまま上げられる。
 - 合計サイズの目安は 15 MB 以下。30 MB 以上は読み込みが遅く、スマホで落ちることもあるので危険。50 MB を超えるとアップロードできない。
 
