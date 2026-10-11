@@ -50,7 +50,7 @@ namespace GRushSdk
                 return null;
             }
             var parts = new List<string>();
-            parts.Add("\"kind\":" + GRushWire.Escape(kind));
+            parts.Add("\"kind\":" + GRushAnalyticsEvent.Escape(kind));
             if (kind == GRushAnalyticsEvent.KindCustom)
             {
                 reason = SanitizeCustom(analyticsEvent, parts);
@@ -77,9 +77,9 @@ namespace GRushSdk
                         builder.Append(',');
                     }
                     builder
-                        .Append(GRushWire.Escape(fields[index].Key))
+                        .Append(GRushAnalyticsEvent.Escape(fields[index].Key))
                         .Append(':')
-                        .Append(GRushWire.Escape(fields[index].Value));
+                        .Append(GRushAnalyticsEvent.Escape(fields[index].Value));
                 }
                 parts.Add(builder.Append('}').ToString());
             }
@@ -103,20 +103,24 @@ namespace GRushSdk
                 {
                     return "name";
                 }
-                parts.Add("\"funnel\":" + GRushWire.Escape(analyticsEvent.Funnel));
+                parts.Add("\"funnel\":" + GRushAnalyticsEvent.Escape(analyticsEvent.Funnel));
+                parts.Add("\"step\":" + analyticsEvent.Step.ToString(CultureInfo.InvariantCulture));
                 if (!string.IsNullOrEmpty(analyticsEvent.FunnelSessionId))
                 {
                     if (!IsKey(analyticsEvent.FunnelSessionId, MaxKeyLength, false))
                     {
                         return "name";
                     }
-                    parts.Add("\"funnelSessionId\":" + GRushWire.Escape(analyticsEvent.FunnelSessionId));
+                    parts.Add("\"funnelSessionId\":" + GRushAnalyticsEvent.Escape(analyticsEvent.FunnelSessionId));
                 }
             }
-            parts.Add("\"step\":" + analyticsEvent.Step.ToString(CultureInfo.InvariantCulture));
+            else
+            {
+                parts.Add("\"step\":" + analyticsEvent.Step.ToString(CultureInfo.InvariantCulture));
+            }
             if (stepName != null)
             {
-                parts.Add("\"stepName\":" + GRushWire.Escape(stepName));
+                parts.Add("\"stepName\":" + GRushAnalyticsEvent.Escape(stepName));
             }
             return null;
         }
@@ -132,7 +136,7 @@ namespace GRushSdk
             {
                 return "value";
             }
-            parts.Add("\"name\":" + GRushWire.Escape(analyticsEvent.Name));
+            parts.Add("\"name\":" + GRushAnalyticsEvent.Escape(analyticsEvent.Name));
             parts.Add("\"value\":" + GRushAnalyticsEvent.Number(value));
             return null;
         }
@@ -167,14 +171,14 @@ namespace GRushSdk
             {
                 return "text";
             }
-            parts.Add("\"flowType\":" + GRushWire.Escape(flowType));
-            parts.Add("\"currency\":" + GRushWire.Escape(analyticsEvent.Currency));
+            parts.Add("\"flowType\":" + GRushAnalyticsEvent.Escape(flowType));
+            parts.Add("\"currency\":" + GRushAnalyticsEvent.Escape(analyticsEvent.Currency));
             parts.Add("\"amount\":" + GRushAnalyticsEvent.Number(amount));
             parts.Add("\"endingBalance\":" + GRushAnalyticsEvent.Number(endingBalance));
-            parts.Add("\"transactionType\":" + GRushWire.Escape(analyticsEvent.TransactionType));
+            parts.Add("\"transactionType\":" + GRushAnalyticsEvent.Escape(analyticsEvent.TransactionType));
             if (itemSku != null)
             {
-                parts.Add("\"itemSku\":" + GRushWire.Escape(itemSku));
+                parts.Add("\"itemSku\":" + GRushAnalyticsEvent.Escape(itemSku));
             }
             return null;
         }
@@ -394,12 +398,17 @@ namespace GRushSdk
         }
     }
 
-    /// <summary>モックが受けた分析イベント。1件ずつログに出し、直近の分をメモリに持つ。どこへも送らない。</summary>
+    /// <summary>
+    /// モックが受けた分析イベント。1件ずつログに出し、直近の分をメモリに持つ。どこへも送らない。
+    /// 拒んだ理由は、GameRush と同じく理由ごとに1回だけ警告する。ほかのスレッドから呼ばれても壊れないよう lock で囲む。
+    /// </summary>
     internal static class GRushMockAnalytics
     {
         public const int MaxEvents = 200;
 
+        private static readonly object Gate = new object();
         private static readonly List<string> Events = new List<string>();
+        private static readonly HashSet<string> Warned = new HashSet<string>();
 
         public static bool Record(GRushAnalyticsEvent analyticsEvent)
         {
@@ -407,13 +416,24 @@ namespace GRushSdk
             var json = GRushAnalyticsRules.Sanitize(analyticsEvent, out reason);
             if (json == null)
             {
-                Debug.LogWarning("[GRushMock] analytics event rejected (" + reason + ").");
+                bool first;
+                lock (Gate)
+                {
+                    first = Warned.Add(reason);
+                }
+                if (first)
+                {
+                    Debug.LogWarning("[GRushMock] analytics event rejected (" + reason + ").");
+                }
                 return false;
             }
-            Events.Add(json);
-            if (Events.Count > MaxEvents)
+            lock (Gate)
             {
-                Events.RemoveRange(0, Events.Count - MaxEvents);
+                Events.Add(json);
+                if (Events.Count > MaxEvents)
+                {
+                    Events.RemoveRange(0, Events.Count - MaxEvents);
+                }
             }
             Debug.Log("[GRushMock] analytics " + json);
             return true;
@@ -421,12 +441,19 @@ namespace GRushSdk
 
         public static string[] Snapshot()
         {
-            return Events.ToArray();
+            lock (Gate)
+            {
+                return Events.ToArray();
+            }
         }
 
         public static void Reset()
         {
-            Events.Clear();
+            lock (Gate)
+            {
+                Events.Clear();
+                Warned.Clear();
+            }
         }
     }
 }

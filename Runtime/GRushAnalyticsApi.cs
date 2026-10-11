@@ -68,8 +68,8 @@ namespace GRushSdk
                     break;
                 case KindFunnel:
                     AddText(parts, "funnel", Funnel);
-                    AddText(parts, "funnelSessionId", FunnelSessionId);
                     parts.Add("\"step\":" + Step.ToString(CultureInfo.InvariantCulture));
+                    AddText(parts, "funnelSessionId", FunnelSessionId);
                     AddText(parts, "stepName", StepName);
                     break;
                 case KindCustom:
@@ -92,13 +92,96 @@ namespace GRushSdk
             return "{" + string.Join(",", parts.ToArray()) + "}";
         }
 
+        /// <summary>
+        /// JavaScript の数の文字列と同じ書式（1e15 は 1000000000000000、1e-7 は 1e-7、1e21 は 1e+21）。
+        /// 有限でない数は null。
+        /// </summary>
         internal static string Number(double value)
         {
             if (double.IsNaN(value) || double.IsInfinity(value))
             {
                 return "null";
             }
-            return value.ToString("R", CultureInfo.InvariantCulture);
+            if (value == 0)
+            {
+                return "0";
+            }
+            var text = Math.Abs(value).ToString("R", CultureInfo.InvariantCulture);
+            var exponent = 0;
+            var mark = text.IndexOfAny(new[] { 'E', 'e' });
+            if (mark >= 0)
+            {
+                exponent = int.Parse(text.Substring(mark + 1), CultureInfo.InvariantCulture);
+                text = text.Substring(0, mark);
+            }
+            var point = text.IndexOf('.');
+            var digits = point < 0 ? text : text.Remove(point, 1);
+            // n は JavaScript の Number::toString の n（小数点の位置）。
+            var n = (point < 0 ? text.Length : point) + exponent;
+            var leading = 0;
+            while (leading < digits.Length - 1 && digits[leading] == '0')
+            {
+                leading++;
+            }
+            digits = digits.Substring(leading).TrimEnd('0');
+            n -= leading;
+            var k = digits.Length;
+            string body;
+            if (k <= n && n <= 21)
+            {
+                body = digits + new string('0', n - k);
+            }
+            else if (0 < n && n <= 21)
+            {
+                body = digits.Substring(0, n) + "." + digits.Substring(n);
+            }
+            else if (-6 < n && n <= 0)
+            {
+                body = "0." + new string('0', -n) + digits;
+            }
+            else
+            {
+                var e = n - 1;
+                body =
+                    digits.Substring(0, 1)
+                    + (k > 1 ? "." + digits.Substring(1) : string.Empty)
+                    + "e"
+                    + (e >= 0 ? "+" : "-")
+                    + Math.Abs(e).ToString(CultureInfo.InvariantCulture);
+            }
+            return value < 0 ? "-" + body : body;
+        }
+
+        /// <summary>
+        /// JSON の文字列。対になっていないサロゲートは \uXXXX で書き、JSON.parse に元の UTF-16 を戻させる。
+        /// そのまま渡すと、孤立サロゲートが UTF-8 への変換で U+FFFD に化け、GameRush が拒めない。
+        /// </summary>
+        internal static string Escape(string value)
+        {
+            var builder = new StringBuilder(value.Length + 2);
+            builder.Append('"');
+            for (var index = 0; index < value.Length; index++)
+            {
+                var c = value[index];
+                if (char.IsHighSurrogate(c) && index + 1 < value.Length && char.IsLowSurrogate(value[index + 1]))
+                {
+                    builder.Append(c).Append(value[index + 1]);
+                    index++;
+                }
+                else if (c == '"' || c == '\\')
+                {
+                    builder.Append('\\').Append(c);
+                }
+                else if (c < ' ' || char.IsSurrogate(c))
+                {
+                    builder.Append("\\u").Append(((int)c).ToString("x4", CultureInfo.InvariantCulture));
+                }
+                else
+                {
+                    builder.Append(c);
+                }
+            }
+            return builder.Append('"').ToString();
         }
 
         internal static string FieldsJson(IDictionary<string, string> fields)
@@ -113,9 +196,9 @@ namespace GRushSdk
                 }
                 first = false;
                 builder
-                    .Append(GRushWire.Escape(entry.Key ?? string.Empty))
+                    .Append(Escape(entry.Key ?? string.Empty))
                     .Append(':')
-                    .Append(entry.Value == null ? "null" : GRushWire.Escape(entry.Value));
+                    .Append(entry.Value == null ? "null" : Escape(entry.Value));
             }
             return builder.Append('}').ToString();
         }
@@ -124,7 +207,7 @@ namespace GRushSdk
         {
             if (value != null)
             {
-                parts.Add("\"" + name + "\":" + GRushWire.Escape(value));
+                parts.Add("\"" + name + "\":" + Escape(value));
             }
         }
     }

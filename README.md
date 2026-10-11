@@ -61,6 +61,9 @@ if (result.Ok)
 ### アナリティクス
 
 ```csharp
+using System.Collections.Generic;
+using GRushSdk;
+
 GRush.Analytics.LogOnboardingStep(1, "tutorial_start");
 GRush.Analytics.LogFunnelStep("shop", "visit-1", 2, "item_selected");
 GRush.Analytics.LogCustomEvent(
@@ -85,10 +88,14 @@ GRush.Analytics.LogEconomyEvent(
 - `step` は 1〜100。`value` は省略で 1、絶対値 1e9 まで。`amount` は正の値で 1e12 まで、`endingBalance`（その後の残高）は絶対値 1e15 まで
 - `transactionType` の標準の値は `GRushEconomyTransactionType` の定数で、ほかの文字列も受ける
 - イベント名・ファネル名・`funnelSessionId` は英数字と `._:-` で 64 文字まで、通貨と `transactionType` は 32 文字まで
-- `stepName`・`itemSku`・`fields` の値は1行のテキストで 40 文字（コードポイント）まで。改行と制御文字は空白に直してから数える。`fields` は3つまで、キーは英数字と `_` で 32 文字まで
-- ファネルの同じステップは、1回のプレイで最初の1回だけが残る。同じファネルを何度も通るなら、通るたびに別の `funnelSessionId` を渡す
+- `stepName`・`itemSku`・`fields` の値は1行のテキストに直してから受ける。改行・制御文字・双方向の上書きと isolate は空白に直し、前後の空白を落としてから 40 文字（コードポイント）まで数える。直した結果が空（空白や見えない文字だけ）の `stepName` と `itemSku` は省略と同じに扱い、`fields` の値は拒む。`fields` は3つまで、キーは英数字と `_` で 32 文字まで
+- オンボーディングとファネルの同じステップは、1セッションで最初の1回だけが残る。セッションはページを読み直しても続く。同じファネルを何度も通るなら、通るたびに別の `funnelSessionId` を渡す
 - 名前・値・`fields` に、プレイヤーを識別できる情報を入れない
 - GameRush の中でも、ゲームが前面に出るまでの分は溜めてから送る。溜められるのは 30 件までで、超えた分は `false`
+- `true` を返しても、次の分は保存されない
+  - 前面に出た後に GameRush 本体が掛ける上限を超えた分。本体は 500ms に1件、まとめて最大 30 件まで受け、送る前の列は合計 200 件まで
+  - セッションあたりの保存の上限を超えた分。オンボーディングを含むファネルのステップ 200 件・カスタムイベント 500 件・エコノミー 500 件
+  - 送れなかった分（送り直さない）
 
 ## エディタでの動作確認
 
@@ -111,7 +118,7 @@ opponent.Received += message => opponent.Send(reply, GRushChannel.Unreliable, GR
 
 共有のモックは確認シートを出さず、`GRushMock.ShareStatus`（既定 `Opened`）を返す。`GRushMock.ShareAvailable = false` で共有できない環境を試せる。本文と画像の検査はしない。
 
-アナリティクスのモックは、GameRush と同じ検査をして、通ったイベントを1件ずつ Console に出し、直近の 200 件を `GRushMock.AnalyticsEvents`（GameRush へ渡すのと同じ形の JSON の配列）で返す（`GRushMock.Reset()` で空になる）。弾いたイベントは理由を警告する。どこへも送らない。モックが名乗る `protocolVersion` は 6。
+アナリティクスのモックは、GameRush と同じ検査をして、通ったイベントを1件ずつ Console に出し、直近の 200 件を `GRushMock.AnalyticsEvents`（GameRush へ渡すのと同じ形の JSON の配列）で返す（`GRushMock.Reset()` で空になる）。弾いたイベントは、GameRush と同じく理由ごとに1回だけ警告する（`GRushMock.Reset()` でまた出る）。どこへも送らない。モックが名乗る `protocolVersion` は 6。前面に出るまでの 30 件の溜め・本体の上限・同じステップを最初の1回だけ残す扱い・セッションあたりの上限は再現しないので、モックでは `true` の分がすべて記録に残る。
 
 **`UnreliableDropRate` は既定 0 だが、出荷前に必ず 0 より大きくして試すこと。** WebSocket 中継では `unreliable` も落ちずに届くため、パケットが落ちる前提で書けているかを確認できる場所はエディタのモックだけになる。
 
