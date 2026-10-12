@@ -53,7 +53,9 @@ namespace GRushSdk
         /// 自分の状態と、相手探しに使う rating（-1e9 より大きく 1e9 より小さい数値）を書く。
         /// <paramref name="rating"/> に null を渡すと rating を消す。
         /// <see cref="GRush.IsMatchmakingAvailable"/> が false の古いランタイムでは rating を送らず、
-        /// payload だけを書く。
+        /// payload だけを書く。true でも古い GameRush 本体では rating が黙って捨てられるので、
+        /// 書けたかは返る状態の <c>HasRating</c> と <c>Rating</c> で確かめる。
+        /// NaN と無限大は送らずに InvalidParams で返す。
         /// </summary>
         public Task<GRushResult<GRushPlayerStatePage>> SetMineAsync(
             string payloadJson,
@@ -93,6 +95,11 @@ namespace GRushSdk
             return SampleCoreAsync(count, true, minRating, maxRating);
         }
 
+        private static bool IsFinite(double value)
+        {
+            return !double.IsNaN(value) && !double.IsInfinity(value);
+        }
+
         private static async Task<GRushResult<GRushPlayerStatePage>> WriteMineAsync(
             string payloadJson,
             int baseRevision,
@@ -103,6 +110,14 @@ namespace GRushSdk
             if (!GRush.IsPlayerStateAvailable)
             {
                 return GRushResult<GRushPlayerStatePage>.Unsupported();
+            }
+            // NaN と無限大は JSON の数値に書けない。そのまま組み立てると壊れた JSON が届き、rating と分からない文言で返る。
+            if (sendRating && rating.HasValue && !IsFinite(rating.Value))
+            {
+                return GRushResult<GRushPlayerStatePage>.Failure(
+                    GRushErrorCode.InvalidParams,
+                    "rating must be a finite number or null."
+                );
             }
             var response = await GRush.CallAsync(
                 "playerState.setMine",
@@ -121,6 +136,13 @@ namespace GRushSdk
             if (!GRush.IsMatchmakingAvailable)
             {
                 return GRushResult<GRushPlayerStatePage>.Unsupported();
+            }
+            if (hasRange && (!IsFinite(minRating) || !IsFinite(maxRating)))
+            {
+                return GRushResult<GRushPlayerStatePage>.Failure(
+                    GRushErrorCode.InvalidParams,
+                    "minRating and maxRating must be finite numbers."
+                );
             }
             var response = await GRush.CallAsync(
                 "playerState.sample",
