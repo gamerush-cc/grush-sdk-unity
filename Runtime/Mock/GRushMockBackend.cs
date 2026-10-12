@@ -17,9 +17,10 @@ namespace GRushSdk
             get { return true; }
         }
 
+        // モックが実装している一番新しい機能（相手探し・受信箱・交換所）の版数。
         public int ProtocolVersion
         {
-            get { return GRush.LocaleProtocolVersion; }
+            get { return GRush.TradeProtocolVersion; }
         }
 
         public void Call(string method, string paramsJson, Action<GRushRpcResponse> onDone)
@@ -128,6 +129,32 @@ namespace GRushSdk
                     return SetPlayerState(paramsJson);
                 case "playerState.get":
                     return GRushRpcResponse.Success(GRushMockPlayerStates.GetJson(paramsJson));
+                case "playerState.sample":
+                    return Sample(paramsJson);
+                case "inbox.send":
+                    return GRushMockInbox.HandleSend(paramsJson, PseudoId);
+                case "inbox.list":
+                    return GRushMockInbox.HandleList(paramsJson);
+                case "inbox.markRead":
+                    return GRushMockInbox.HandleMarkRead(paramsJson);
+                case "inbox.remove":
+                    return GRushMockInbox.HandleRemove(paramsJson);
+                case "inbox.report":
+                    return GRushMockInbox.HandleReport(paramsJson);
+                case "trade.create":
+                    return GRushMockTrades.HandleCreate(paramsJson, PseudoId);
+                case "trade.list":
+                    return GRushMockTrades.HandleList(paramsJson, PseudoId);
+                case "trade.mine":
+                    return GRushMockTrades.HandleMine(PseudoId);
+                case "trade.accept":
+                    return GRushMockTrades.HandleAccept(paramsJson, PseudoId);
+                case "trade.cancel":
+                    return GRushMockTrades.HandleCancel(paramsJson, PseudoId);
+                case "trade.ack":
+                    return GRushMockTrades.HandleAck(paramsJson, PseudoId);
+                case "trade.report":
+                    return GRushMockTrades.HandleReport(paramsJson, PseudoId);
                 case "locale.get":
                     return GRushRpcResponse.Success(GRushMockLocale.CurrentJson());
                 case "share.getAvailability":
@@ -144,6 +171,7 @@ namespace GRushSdk
 
         private string mockPlayerState;
         private int mockPlayerStateRevision;
+        private double? mockPlayerStateRating;
 
         private GRushRpcResponse SetPlayerState(string paramsJson)
         {
@@ -153,6 +181,27 @@ namespace GRushSdk
             {
                 return GRushRpcResponse.Failure(GRushErrorCode.InvalidParams, error);
             }
+            // rating の項目が無ければ今の値のまま、null なら消す。
+            var rating = mockPlayerStateRating;
+            var members = GRushMockJson.Members(paramsJson);
+            string rawRating;
+            if (members != null && members.TryGetValue("rating", out rawRating))
+            {
+                double value;
+                if (GRushMockJson.IsNull(rawRating))
+                {
+                    rating = null;
+                }
+                else if (GRushMockJson.TryNumber(rawRating, out value) && GRushMockPlayerStates.IsRating(value))
+                {
+                    rating = value;
+                }
+                else
+                {
+                    return GRushRpcResponse.Failure(GRushErrorCode.InvalidParams, "Invalid rating.");
+                }
+            }
+            mockPlayerStateRating = rating;
             mockPlayerStateRevision += 1;
             mockPlayerState =
                 "{\"state\":{\"pseudoId\":"
@@ -161,8 +210,21 @@ namespace GRushSdk
                 + payload
                 + ",\"revision\":"
                 + mockPlayerStateRevision
+                + ",\"rating\":"
+                + (rating.HasValue ? GRushWire.Number(rating.Value) : "0")
+                + ",\"hasRating\":"
+                + (rating.HasValue ? "true" : "false")
                 + ",\"updatedAt\":\"\"}}";
             return GRushRpcResponse.Success(mockPlayerState);
+        }
+
+        private static GRushRpcResponse Sample(string paramsJson)
+        {
+            string error;
+            var json = GRushMockPlayerStates.SampleJson(paramsJson, PseudoId, out error);
+            return error != null
+                ? GRushRpcResponse.Failure(GRushErrorCode.InvalidParams, error)
+                : GRushRpcResponse.Success(json);
         }
 
         private GRushRpcResponse SubmitScore(string paramsJson)
@@ -266,7 +328,7 @@ namespace GRushSdk
             }
         }
 
-        private static string PseudoId
+        internal static string PseudoId
         {
             get
             {

@@ -84,6 +84,79 @@ var GRushBridgeLibrary = {
       });
     },
 
+    // The runtime may resolve with the bare value or with the RPC result that already wraps it.
+    envelope: function (promise, key) {
+      return promise.then(function (value) {
+        if (value && typeof value === "object" && !Array.isArray(value) && key in value) return value;
+        var envelope = {};
+        envelope[key] = value === undefined ? null : value;
+        return envelope;
+      });
+    },
+
+    // JsonUtility cannot read a null number, so each player state also says whether it has a rating.
+    state: function (state) {
+      if (!state || typeof state !== "object") return state;
+      var copy = Object.assign({}, state);
+      copy.hasRating = typeof state.rating === "number";
+      copy.rating = copy.hasRating ? state.rating : 0;
+      return copy;
+    },
+
+    states: function (list) {
+      return Array.isArray(list) ? list.map(GRushBridge.state) : [];
+    },
+
+    // JsonUtility cannot read an object of any shape, so payloads and trade items also travel as JSON
+    // strings the game hands to its own parser (or to JsonUtility with its own type).
+    json: function (value) {
+      return value && typeof value === "object" ? JSON.stringify(value) : "";
+    },
+
+    message: function (message) {
+      var copy = Object.assign({}, message);
+      copy.payloadJson = GRushBridge.json(message && message.payload);
+      return copy;
+    },
+
+    inboxPage: function (page) {
+      var copy = Object.assign({}, page);
+      copy.messages = Array.isArray(page && page.messages) ? page.messages.map(GRushBridge.message) : [];
+      return copy;
+    },
+
+    trade: function (trade) {
+      if (!trade || typeof trade !== "object") return trade;
+      var copy = Object.assign({}, trade);
+      copy.offerJson = GRushBridge.json(trade.offer);
+      copy.wantJson = GRushBridge.json(trade.want);
+      copy.giveJson = GRushBridge.json(trade.give);
+      return copy;
+    },
+
+    trades: function (list) {
+      return Array.isArray(list) ? list.map(GRushBridge.trade) : [];
+    },
+
+    withTrade: function (value) {
+      var copy = Object.assign({}, value);
+      if (copy.trade) copy.trade = GRushBridge.trade(copy.trade);
+      return copy;
+    },
+
+    tradePage: function (page) {
+      var copy = Object.assign({}, page);
+      copy.trades = GRushBridge.trades(page && page.trades);
+      return copy;
+    },
+
+    myTrades: function (mine) {
+      return {
+        open: GRushBridge.trades(mine && mine.open),
+        pending: GRushBridge.trades(mine && mine.pending),
+      };
+    },
+
     invoke: function (method, params) {
       var player = GRushBridge.api("GRushPlayer");
       var net = GRushBridge.api("GRushNet");
@@ -117,16 +190,56 @@ var GRushBridgeLibrary = {
         return GRushBridge.wrap(boards.friends(args.key, args), "leaderboard");
       }
       if (method === "playerState.getMine" && states) {
-        return GRushBridge.wrap(states.getMine(), "state");
+        return GRushBridge.wrap(states.getMine().then(GRushBridge.state), "state");
       }
       if (method === "playerState.setMine" && states) {
-        return GRushBridge.wrap(states.setMine(args.payload, args.baseRevision), "state");
+        // rating is in the params only when the runtime is new enough to read it (see GRushPlayerStateApi).
+        var written =
+          "rating" in args
+            ? states.setMine(args.payload, args.baseRevision, { rating: args.rating })
+            : states.setMine(args.payload, args.baseRevision);
+        return GRushBridge.wrap(written.then(GRushBridge.state), "state");
       }
       if (method === "playerState.get" && states) {
-        return GRushBridge.wrap(states.get(args.pseudoIds), "states");
+        return GRushBridge.wrap(states.get(args.pseudoIds).then(GRushBridge.states), "states");
       }
       if (method === "playerState.report" && states) {
         return GRushBridge.wrap(states.report(args.pseudoId), "reported");
+      }
+      if (method === "playerState.sample" && states) {
+        return GRushBridge.envelope(states.sample(args), "states").then(function (value) {
+          return { states: GRushBridge.states(value.states) };
+        });
+      }
+      var inbox = GRushBridge.api("GRushInbox");
+      if (method === "inbox.send" && inbox) {
+        return GRushBridge.envelope(inbox.send(args.to, args.kind, args.payload), "sent");
+      }
+      if (method === "inbox.list" && inbox) return inbox.list(args).then(GRushBridge.inboxPage);
+      if (method === "inbox.markRead" && inbox) {
+        return GRushBridge.envelope(inbox.markRead(args.ids), "updated");
+      }
+      if (method === "inbox.remove" && inbox) {
+        return GRushBridge.envelope(inbox.remove(args.ids), "updated");
+      }
+      if (method === "inbox.report" && inbox) {
+        return GRushBridge.envelope(inbox.report(args.messageId), "reported");
+      }
+      var trade = GRushBridge.api("GRushTrade");
+      if (method === "trade.create" && trade) {
+        return GRushBridge.envelope(trade.create(args), "trade").then(GRushBridge.withTrade);
+      }
+      if (method === "trade.list" && trade) return trade.list(args).then(GRushBridge.tradePage);
+      if (method === "trade.mine" && trade) return trade.mine().then(GRushBridge.myTrades);
+      if (method === "trade.accept" && trade) {
+        return trade.accept(args.tradeId, args.give).then(GRushBridge.withTrade);
+      }
+      if (method === "trade.cancel" && trade) {
+        return GRushBridge.envelope(trade.cancel(args.tradeId), "trade").then(GRushBridge.withTrade);
+      }
+      if (method === "trade.ack" && trade) return GRushBridge.envelope(trade.ack(args.ids), "acked");
+      if (method === "trade.report" && trade) {
+        return GRushBridge.envelope(trade.report(args.tradeId), "reported");
       }
       var locale = GRushBridge.localeApi();
       if (method === "locale.get" && locale) return locale.get();

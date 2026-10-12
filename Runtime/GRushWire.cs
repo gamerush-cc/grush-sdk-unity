@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 
@@ -55,6 +56,101 @@ namespace GRushSdk
         public string pseudoId;
         public int revision;
         public string updatedAt;
+
+        // JsonUtility は null の数値を読めないので、Web の層とモックが hasRating を添える。
+        public double rating;
+        public bool hasRating;
+    }
+
+    [Serializable]
+    internal class GRushInboxMessageWire
+    {
+        public string id;
+        public string from;
+        public string kind;
+        public string payloadJson;
+        public string createdAt;
+        public string readAt;
+    }
+
+    [Serializable]
+    internal class GRushInboxPageWire
+    {
+        public GRushInboxMessageWire[] messages;
+        public int unreadCount;
+        public string nextCursor;
+    }
+
+    [Serializable]
+    internal class GRushSentWire
+    {
+        public bool sent;
+    }
+
+    [Serializable]
+    internal class GRushUpdatedWire
+    {
+        public int updated;
+    }
+
+    [Serializable]
+    internal class GRushAckedWire
+    {
+        public int acked;
+    }
+
+    [Serializable]
+    internal class GRushIdsWire
+    {
+        public string[] ids;
+    }
+
+    // 任意の形の offer・want・give は、Web の層とモックが JSON の文字列にして *Json に入れる。
+    [Serializable]
+    internal class GRushTradeWire
+    {
+        public string id;
+        public string from;
+        public string to;
+        public string taker;
+        public string offerJson;
+        public string wantJson;
+        public string offerKey;
+        public string wantKey;
+        public string giveJson;
+        public string status;
+        public string createdAt;
+        public string expiresAt;
+        public string settledAt;
+        public string role;
+        public string action;
+    }
+
+    [Serializable]
+    internal class GRushTradeEnvelope
+    {
+        public GRushTradeWire trade;
+    }
+
+    [Serializable]
+    internal class GRushTradePageWire
+    {
+        public GRushTradeWire[] trades;
+        public string nextCursor;
+    }
+
+    [Serializable]
+    internal class GRushMyTradesWire
+    {
+        public GRushTradeWire[] open;
+        public GRushTradeWire[] pending;
+    }
+
+    [Serializable]
+    internal class GRushTradeAcceptWire
+    {
+        public string outcome;
+        public GRushTradeWire trade;
     }
 
     [Serializable]
@@ -331,10 +427,31 @@ namespace GRushSdk
 
         public static string PlayerStateParams(string payloadJson, int baseRevision)
         {
+            return PlayerStateParams(payloadJson, baseRevision, false, null);
+        }
+
+        /// <summary>
+        /// <paramref name="sendRating"/> が true のときだけ rating を載せる（null は消す）。
+        /// false なら rating の項目を持たず、サーバは今の rating を変えない。
+        /// </summary>
+        public static string PlayerStateParams(
+            string payloadJson,
+            int baseRevision,
+            bool sendRating,
+            double? rating
+        )
+        {
             var builder = new StringBuilder("{");
             if (baseRevision >= 0)
             {
                 builder.Append("\"baseRevision\":").Append(baseRevision).Append(',');
+            }
+            if (sendRating)
+            {
+                builder
+                    .Append("\"rating\":")
+                    .Append(rating.HasValue ? Number(rating.Value) : "null")
+                    .Append(',');
             }
             // payload は呼び出し側が組み立てた生 JSON をそのまま載せる。
             // 壊れた JSON と 4KB 超はサーバが 400 で弾く。
@@ -375,7 +492,257 @@ namespace GRushSdk
                 PseudoId = wire.pseudoId,
                 Revision = wire.revision,
                 UpdatedAt = wire.updatedAt,
+                Rating = wire.hasRating ? wire.rating : 0,
+                HasRating = wire.hasRating,
             };
+        }
+
+        public static string Number(double value)
+        {
+            return value.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        // 呼び出し側が組み立てた JSON をそのまま載せる。空は null として送り、ランタイムが弾く。
+        private static string Raw(string json)
+        {
+            return string.IsNullOrEmpty(json) ? "null" : json;
+        }
+
+        public static string SampleParams(int count, bool hasRange, double minRating, double maxRating)
+        {
+            var fields = new List<string>();
+            if (count > 0)
+            {
+                fields.Add("\"count\":" + count);
+            }
+            if (hasRange)
+            {
+                fields.Add("\"minRating\":" + Number(minRating));
+                fields.Add("\"maxRating\":" + Number(maxRating));
+            }
+            return "{" + string.Join(",", fields.ToArray()) + "}";
+        }
+
+        public static string StringParams(string name, string value)
+        {
+            return "{\"" + name + "\":" + Escape(value ?? string.Empty) + "}";
+        }
+
+        public static string IdsParams(string[] ids)
+        {
+            var builder = new StringBuilder("{\"ids\":[");
+            if (ids != null)
+            {
+                for (var index = 0; index < ids.Length; index++)
+                {
+                    if (index > 0)
+                    {
+                        builder.Append(',');
+                    }
+                    builder.Append(Escape(ids[index] ?? string.Empty));
+                }
+            }
+            return builder.Append("]}").ToString();
+        }
+
+        public static string InboxSendParams(string to, string kind, string payloadJson)
+        {
+            return "{\"to\":"
+                + Escape(to ?? string.Empty)
+                + ",\"kind\":"
+                + Escape(kind ?? string.Empty)
+                + ",\"payload\":"
+                + Raw(payloadJson)
+                + "}";
+        }
+
+        public static string InboxListParams(bool unreadOnly, int limit, string cursor)
+        {
+            var fields = new List<string>();
+            if (unreadOnly)
+            {
+                fields.Add("\"unreadOnly\":true");
+            }
+            if (limit > 0)
+            {
+                fields.Add("\"limit\":" + limit);
+            }
+            if (!string.IsNullOrEmpty(cursor))
+            {
+                fields.Add("\"cursor\":" + Escape(cursor));
+            }
+            return "{" + string.Join(",", fields.ToArray()) + "}";
+        }
+
+        public static string TradeCreateParams(
+            string offerJson,
+            string wantJson,
+            string operationId,
+            GRushTradeOptions options
+        )
+        {
+            var fields = new List<string>
+            {
+                "\"offer\":" + Raw(offerJson),
+                "\"want\":" + Raw(wantJson),
+                "\"operationId\":" + Escape(operationId ?? string.Empty),
+            };
+            if (!string.IsNullOrEmpty(options.OfferKey))
+            {
+                fields.Add("\"offerKey\":" + Escape(options.OfferKey));
+            }
+            if (!string.IsNullOrEmpty(options.WantKey))
+            {
+                fields.Add("\"wantKey\":" + Escape(options.WantKey));
+            }
+            if (!string.IsNullOrEmpty(options.To))
+            {
+                fields.Add("\"to\":" + Escape(options.To));
+            }
+            if (options.ExpiresInSec > 0)
+            {
+                fields.Add("\"expiresInSec\":" + options.ExpiresInSec);
+            }
+            return "{" + string.Join(",", fields.ToArray()) + "}";
+        }
+
+        public static string TradeListParams(string offerKey, string wantKey, int limit, string cursor)
+        {
+            var fields = new List<string>();
+            if (!string.IsNullOrEmpty(offerKey))
+            {
+                fields.Add("\"offerKey\":" + Escape(offerKey));
+            }
+            if (!string.IsNullOrEmpty(wantKey))
+            {
+                fields.Add("\"wantKey\":" + Escape(wantKey));
+            }
+            if (limit > 0)
+            {
+                fields.Add("\"limit\":" + limit);
+            }
+            if (!string.IsNullOrEmpty(cursor))
+            {
+                fields.Add("\"cursor\":" + Escape(cursor));
+            }
+            return "{" + string.Join(",", fields.ToArray()) + "}";
+        }
+
+        public static string TradeAcceptParams(string tradeId, string giveJson)
+        {
+            return "{\"tradeId\":" + Escape(tradeId ?? string.Empty) + ",\"give\":" + Raw(giveJson) + "}";
+        }
+
+        private static string NullIfEmpty(string value)
+        {
+            return string.IsNullOrEmpty(value) ? null : value;
+        }
+
+        public static GRushInboxMessage ToInboxMessage(GRushInboxMessageWire wire)
+        {
+            return new GRushInboxMessage
+            {
+                Id = wire.id,
+                From = wire.from,
+                Kind = wire.kind,
+                PayloadJson = string.IsNullOrEmpty(wire.payloadJson) ? "{}" : wire.payloadJson,
+                CreatedAt = wire.createdAt,
+                ReadAt = NullIfEmpty(wire.readAt),
+                IsRead = !string.IsNullOrEmpty(wire.readAt),
+            };
+        }
+
+        public static GRushTrade ToTrade(GRushTradeWire wire)
+        {
+            return new GRushTrade
+            {
+                Id = wire.id,
+                From = NullIfEmpty(wire.from),
+                To = NullIfEmpty(wire.to),
+                Taker = NullIfEmpty(wire.taker),
+                OfferJson = string.IsNullOrEmpty(wire.offerJson) ? "{}" : wire.offerJson,
+                WantJson = string.IsNullOrEmpty(wire.wantJson) ? "{}" : wire.wantJson,
+                OfferKey = NullIfEmpty(wire.offerKey),
+                WantKey = NullIfEmpty(wire.wantKey),
+                GiveJson = NullIfEmpty(wire.giveJson),
+                Status = TradeStatusOf(wire.status),
+                CreatedAt = wire.createdAt,
+                ExpiresAt = wire.expiresAt,
+                SettledAt = NullIfEmpty(wire.settledAt),
+            };
+        }
+
+        public static GRushTrade[] ToTrades(GRushTradeWire[] wires)
+        {
+            var source = wires ?? new GRushTradeWire[0];
+            var trades = new List<GRushTrade>(source.Length);
+            foreach (var wire in source)
+            {
+                if (wire != null && !string.IsNullOrEmpty(wire.id))
+                {
+                    trades.Add(ToTrade(wire));
+                }
+            }
+            return trades.ToArray();
+        }
+
+        public static GRushPendingTrade ToPendingTrade(GRushTradeWire wire)
+        {
+            return new GRushPendingTrade
+            {
+                Trade = ToTrade(wire),
+                Role =
+                    wire.role == "offerer" ? GRushTradeRole.Offerer
+                    : wire.role == "taker" ? GRushTradeRole.Taker
+                    : GRushTradeRole.Unknown,
+                Action =
+                    wire.action == "receiveGive" ? GRushTradeAction.ReceiveGive
+                    : wire.action == "returnOffer" ? GRushTradeAction.ReturnOffer
+                    : wire.action == "receiveOffer" ? GRushTradeAction.ReceiveOffer
+                    : GRushTradeAction.Unknown,
+            };
+        }
+
+        public static GRushTradeStatus TradeStatusOf(string status)
+        {
+            switch (status)
+            {
+                case "open":
+                    return GRushTradeStatus.Open;
+                case "matched":
+                    return GRushTradeStatus.Matched;
+                case "cancelled":
+                    return GRushTradeStatus.Cancelled;
+                case "expired":
+                    return GRushTradeStatus.Expired;
+                default:
+                    return GRushTradeStatus.Unknown;
+            }
+        }
+
+        public static bool TryTradeOutcome(string outcome, out GRushTradeOutcome value)
+        {
+            switch (outcome)
+            {
+                case "matched":
+                    value = GRushTradeOutcome.Matched;
+                    return true;
+                case "taken":
+                    value = GRushTradeOutcome.Taken;
+                    return true;
+                case "expired":
+                    value = GRushTradeOutcome.Expired;
+                    return true;
+                case "cancelled":
+                    value = GRushTradeOutcome.Cancelled;
+                    return true;
+                case "notFound":
+                    value = GRushTradeOutcome.NotFound;
+                    return true;
+                default:
+                    value = GRushTradeOutcome.NotFound;
+                    return false;
+            }
         }
 
         /// <summary>

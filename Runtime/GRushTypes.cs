@@ -56,6 +56,11 @@ namespace GRushSdk
         public string PseudoId;
         public int Revision;
         public string UpdatedAt;
+
+        /// <summary>相手探しに使う数値。<see cref="HasRating"/> が false なら書かれていない（0 は値ではない）。</summary>
+        public double Rating;
+
+        public bool HasRating;
     }
 
     /// <summary>
@@ -137,6 +142,176 @@ namespace GRushSdk
         public int Rank;
         public bool HasRank;
         public bool Verified;
+    }
+
+    /// <summary>
+    /// 受信箱のメッセージ。<see cref="PayloadJson"/> は送り手が渡した payload の JSON で、
+    /// 文字列は識別子（<c>^[A-Za-z0-9_.:-]{1,32}$</c>）、ほかは数値・真偽値・null だけからなる。
+    /// 中身はゲームの型へ <c>JsonUtility.FromJson</c> などで読む。
+    /// </summary>
+    [Serializable]
+    public struct GRushInboxMessage
+    {
+        public string Id;
+
+        /// <summary>送り手の疑似 ID。</summary>
+        public string From;
+
+        public string Kind;
+        public string PayloadJson;
+        public string CreatedAt;
+
+        /// <summary>既読にした日時。未読なら null。</summary>
+        public string ReadAt;
+
+        public bool IsRead;
+    }
+
+    [Serializable]
+    public struct GRushInboxPage
+    {
+        /// <summary>新しい順。</summary>
+        public GRushInboxMessage[] Messages;
+
+        /// <summary>絞り込みによらない未読の数。</summary>
+        public int UnreadCount;
+
+        /// <summary>続きがあれば次の <c>ListAsync</c> の cursor に渡す。無ければ null。</summary>
+        public string NextCursor;
+    }
+
+    /// <summary>出品の状態。知らない値は <see cref="Unknown"/> になる。</summary>
+    public enum GRushTradeStatus
+    {
+        Unknown,
+        Open,
+        Matched,
+        Cancelled,
+        Expired,
+    }
+
+    public enum GRushTradeRole
+    {
+        Unknown,
+        Offerer,
+        Taker,
+    }
+
+    /// <summary>
+    /// 終わった取引で、手元のセーブへ反映すること。<see cref="Unknown"/> は反映せず、Ack もしない。
+    /// </summary>
+    public enum GRushTradeAction
+    {
+        Unknown,
+
+        /// <summary>出品者が、受けた側の give を受け取る。</summary>
+        ReceiveGive,
+
+        /// <summary>出品者が、出した offer を手元へ戻す（取り下げ・期限切れ・運営の非表示）。</summary>
+        ReturnOffer,
+
+        /// <summary>受けた側が offer を受け取る。</summary>
+        ReceiveOffer,
+    }
+
+    public enum GRushTradeOutcome
+    {
+        Matched,
+
+        /// <summary>先に別のプレイヤーが受けた。</summary>
+        Taken,
+
+        Expired,
+        Cancelled,
+
+        /// <summary>見えない出品（伏せられた・自分の・自分宛てでない指名・ブロック関係にある相手の）。</summary>
+        NotFound,
+    }
+
+    /// <summary>
+    /// 出品。<see cref="OfferJson"/>・<see cref="WantJson"/>・<see cref="GiveJson"/> は JSON で、
+    /// 文字列は識別子、ほかは数値・真偽値・null だけからなる。疑似 ID が消えた相手は null。
+    /// </summary>
+    [Serializable]
+    public struct GRushTrade
+    {
+        public string Id;
+
+        /// <summary>出品者の疑似 ID。</summary>
+        public string From;
+
+        /// <summary>指名の出品の相手。公開の出品では null。</summary>
+        public string To;
+
+        /// <summary>成立させた相手の疑似 ID。</summary>
+        public string Taker;
+
+        public string OfferJson;
+        public string WantJson;
+        public string OfferKey;
+        public string WantKey;
+
+        /// <summary>受けた側が渡したもの。当事者（出品者と受けた側）にだけ入り、ほかの人には null。</summary>
+        public string GiveJson;
+
+        public GRushTradeStatus Status;
+        public string CreatedAt;
+        public string ExpiresAt;
+        public string SettledAt;
+    }
+
+    [Serializable]
+    public struct GRushTradePage
+    {
+        /// <summary>他人の公開の出品と自分宛ての指名の出品のうち、受付中のもの（新しい順）。</summary>
+        public GRushTrade[] Trades;
+
+        public string NextCursor;
+    }
+
+    /// <summary>終わったが、まだ Ack していない取引。</summary>
+    [Serializable]
+    public struct GRushPendingTrade
+    {
+        public GRushTrade Trade;
+        public GRushTradeRole Role;
+        public GRushTradeAction Action;
+    }
+
+    [Serializable]
+    public struct GRushMyTrades
+    {
+        /// <summary>自分の受付中の出品。</summary>
+        public GRushTrade[] Open;
+
+        /// <summary>終わったが、まだ Ack していない取引（終わった順）。</summary>
+        public GRushPendingTrade[] Pending;
+    }
+
+    [Serializable]
+    public struct GRushTradeAcceptResult
+    {
+        public GRushTradeOutcome Outcome;
+
+        /// <summary><see cref="Trade"/> が入っているか。Matched のとき true。</summary>
+        public bool HasTrade;
+
+        public GRushTrade Trade;
+    }
+
+    /// <summary>出品の省略できる項目。既定値のままなら送らない。</summary>
+    public struct GRushTradeOptions
+    {
+        /// <summary>一覧の絞り込みに使う識別子（<c>^[A-Za-z0-9._:-]{1,32}$</c>）。</summary>
+        public string OfferKey;
+
+        public string WantKey;
+
+        /// <summary>指名の出品の相手の疑似 ID。null なら公開の出品。</summary>
+        public string To;
+
+        /// <summary>期限の秒数（600〜604800）。0 なら 3 日。</summary>
+        public int ExpiresInSec;
     }
 
     public static class GRushChannels

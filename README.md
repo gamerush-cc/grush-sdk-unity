@@ -7,7 +7,7 @@ GameRush の GameAPI を Unity から呼ぶための UPM パッケージ。ビ�
 Package Manager の `Add package from git URL...` に次を入れる。
 
 ```text
-https://github.com/gamerush-cc/grush-sdk-unity.git#v1.4.0
+https://github.com/gamerush-cc/grush-sdk-unity.git#v1.5.0
 ```
 
 Unity 2021.3 以降。ビルドターゲットは WebGL。
@@ -33,6 +33,68 @@ if (joined.Ok)
 ```
 
 `GRush` は例外を投げない。GameRush の外で動かした場合も `GRushResult<T>.Ok` が `false`、`Code` が `GRushErrorCode.Unsupported` になるだけで、ゲームは止まらない。
+
+### 相手探し
+
+```csharp
+await GRush.PlayerState.SetMineAsync("{\"deck\":\"fire\",\"level\":12}", -1, 1520);
+var found = await GRush.PlayerState.SampleAsync(5, 1400, 1600);
+if (found.Ok)
+{
+    foreach (var rival in found.Value.States) Debug.Log(rival.PseudoId + " " + rival.Rating);
+}
+```
+
+`SampleAsync` は同じゲームの他プレイヤーの公開状態をランダムに返す（件数は 1〜20、既定 10）。自分と運営が伏せた状態は返らず、名前も返らない。範囲を渡すと、rating の無い状態は返らない。payload は `RawJson`（応答そのもの）から読む。`SetMineAsync` の第3引数の rating は -1e9 より大きく 1e9 より小さい数値で、`null` で消し、2引数の版では今の値のまま。`GRushPlayerState.HasRating` が false なら rating は書かれていない。`GRush.IsMatchmakingAvailable` が `false`（`protocolVersion` 7 未満）では `SampleAsync` が `Unsupported`、`SetMineAsync` は rating を送らずに payload だけを書く。
+
+### 受信箱
+
+```csharp
+await GRush.Inbox.SendAsync(rivalPseudoId, "battleResult", "{\"stage\":3,\"win\":true}");
+var inbox = await GRush.Inbox.ListAsync(true);
+if (inbox.Ok)
+{
+    foreach (var message in inbox.Value.Messages)
+    {
+        var result = JsonUtility.FromJson<BattleResult>(message.PayloadJson);
+    }
+}
+```
+
+同じゲームの疑似 ID 宛てに、小さい構造化メッセージ（非同期対戦の結果の通知など）を送る。ゲストも送受信できる。**payload で文章や画像は送れない。** payload は JSON オブジェクトで、文字列の値とキーは識別子（`^[A-Za-z0-9_.:-]{1,32}$`）だけ、ほかは数値・真偽値・null。入れ子は最上位を 1 段目として 4 段まで、値は合計 64 個まで、詰めた JSON で 1KB まで。`kind` は `^[A-Za-z0-9._:-]{1,32}$`。合わなければ `InvalidParams`。利用者どうしの文章や画像のやりとりには使わない。
+
+`ListAsync(unreadOnly, limit, cursor)` は新しい順（`limit` は 1〜50、0 なら 20）。続きは `NextCursor` を渡して読む。`MarkReadAsync` / `RemoveAsync` は 1 回 50 件まで。`ReportAsync(messageId)` は GameRush が確認を出し、承諾されたら `true`。通報すると送り手をブロックし、その相手のメッセージと出品は見えなくなる。ゲストは `SignInRequired`。`GRush.IsInboxAvailable` が `false`（`protocolVersion` 7 未満）ではどれも `Unsupported`。
+
+### 交換所
+
+```csharp
+// 1. 出すアイテムをセーブで仮置きにし、2. operationId と一緒に保存してから出品する。
+var created = await GRush.Trade.CreateAsync(
+    "{\"item\":\"sword\",\"count\":1}",
+    "{\"item\":\"gem\",\"count\":3}",
+    save.EscrowOperationId,
+    new GRushTradeOptions { OfferKey = "sword", WantKey = "gem" }
+);
+
+// 4. 終わった取引をセーブへ反映し、保存してから Ack する。5. 取引 ID で二度反映しない。
+var mine = await GRush.Trade.MineAsync();
+```
+
+プレイヤーがアイテムを出品し、同じゲームの別のプレイヤーが `AcceptAsync(tradeId, giveJson)` で受ける。ゲストも出品・受諾できる。GameRush はアイテムの正当性を確かめず、交換が片方だけ成立しないことと、終わった取引を取りこぼさないことだけを保証する。
+
+取りこぼさないために、次の順で使う。
+
+1. 出品の前に、出すアイテムを手元のセーブで仮置き（使えない状態）にする
+2. `operationId`（`^[A-Za-z0-9._:-]{1,64}$`）をセーブに保存してから `CreateAsync` する
+3. 応答が失われたら、同じ `operationId` で呼び直す。同じ `operationId` の再送は、中身によらず先に作った出品を返す
+4. `MineAsync` の `Pending` をセーブに反映し、クラウドセーブに保存してから `AckAsync` する
+5. 反映済みの取引 ID をセーブに持ち、同じ取引を二度反映しない
+
+`Pending` の `Action` は `ReceiveGive`（出品者が `GiveJson` を受け取る）・`ReturnOffer`（出品者が `OfferJson` を戻す。取り下げ・期限切れ・運営の非表示）・`ReceiveOffer`（受けた側が `OfferJson` を受け取る）。`Unknown` は反映せず、Ack もしない。
+
+**offer・want・give で文章や画像は送れない。** 形は受信箱の payload と同じで、大きさは詰めた JSON で offer 2KB・want 1KB・give 2KB まで。`OfferJson` などはそのまま `JsonUtility.FromJson` でゲームの型に読める。利用者どうしの文章や画像のやりとりには使わない。
+
+`AcceptAsync` は先に取られた・期限切れ・取り下げ・見えない出品をエラーにせず、`Outcome`（`Matched` / `Taken` / `Expired` / `Cancelled` / `NotFound`）で返す。`Trade` は `Matched` のときだけ入る（`HasTrade`）。同じ取引への再送は `Matched`。`GRushTradeOptions.To` に疑似 ID を入れると指名の出品になり、`ExpiresInSec` は 600〜604800（0 なら 3 日）。受付中の出品は 1 人 10 件まで。`ListAsync` は他人の公開の出品と自分宛ての指名の出品のうち、受付中のもの（新しい順）。`ReportAsync(tradeId)` は GameRush が確認を出し、承諾されたら `true`。通報すると出品者をブロックする。`GRush.IsTradeAvailable` が `false`（`protocolVersion` 7 未満）ではどれも `Unsupported`。
 
 ### 共有
 
@@ -78,6 +140,16 @@ opponent.Received += message => opponent.Send(reply, GRushChannel.Unreliable, GR
 表示言語のモックは `GRushMock.SetLocale("en")`（`Source` は `user`）で切り替わり、`Changed` が飛ぶ。未設定なら `Application.systemLanguage` から写した値を `Source = "device"` で返す。
 
 共有のモックは確認シートを出さず、`GRushMock.ShareStatus`（既定 `Opened`）を返す。`GRushMock.ShareAvailable = false` で共有できない環境を試せる。本文と画像の検査はしない。
+
+相手探し・受信箱・交換所のモックは、`GRushMock.Rivals` の 3 人の相手を持つ。相手はそれぞれ rating 付きの公開プレイヤー状態を持ち、届いたメッセージを同じ kind と payload で送り返す。はじめと `GRushMock.Reset()` の後は、最初の相手からのメッセージ1通と、相手の受付中の出品を2件持つ。payload・offer・want・give の形、`operationId` での冪等、受付中の出品の上限、受諾の `Outcome`、`Pending` と Ack は GameRush と同じ規則で動く。通報を承諾すると（`GRushMock.ConfirmInboxReport` / `ConfirmTradeReport`、既定 `true`）相手をブロックし、その相手のメッセージと出品は見えなくなる。
+
+```csharp
+GRushMockInbox.Receive(GRushMock.Rivals[0], "battleResult", "{\"stage\":3,\"win\":false}");
+var listingId = GRushMockTrades.OfferToSelf(GRushMock.Rivals[1], "{\"item\":\"bow\"}", "{\"item\":\"gem\"}");
+GRushMockTrades.Accept(myTradeId, "{\"item\":\"gem\"}"); // 相手が受けて、自分の Pending に ReceiveGive が載る
+GRushMockTrades.Expire(listingId);
+GRushMockPlayerStates.Define("custom-rival", "{\"level\":3}", false, 1300);
+```
 
 **`UnreliableDropRate` は既定 0 だが、出荷前に必ず 0 より大きくして試すこと。** WebSocket 中継では `unreliable` も落ちずに届くため、パケットが落ちる前提で書けているかを確認できる場所はエディタのモックだけになる。
 

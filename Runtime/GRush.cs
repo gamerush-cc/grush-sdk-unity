@@ -9,6 +9,16 @@ namespace GRushSdk
         public const int PlayerStateProtocolVersion = 2;
         public const int ShareProtocolVersion = 3;
         public const int LocaleProtocolVersion = 4;
+
+        /// <summary>相手探し（<c>PlayerState.SampleAsync</c> と <c>SetMineAsync</c> の rating）に要る版数。</summary>
+        public const int MatchmakingProtocolVersion = 7;
+
+        /// <summary>受信箱（<see cref="Inbox"/>）に要る版数。</summary>
+        public const int InboxProtocolVersion = 7;
+
+        /// <summary>交換所（<see cref="Trade"/>）に要る版数。</summary>
+        public const int TradeProtocolVersion = 7;
+
         public const int MaxMessageBytes = 8 * 1024;
 
         private static IGRushBackend backend;
@@ -18,6 +28,8 @@ namespace GRushSdk
         private static GRushPlayerStateApi playerState;
         private static GRushShareApi share;
         private static GRushLocaleApi locale;
+        private static GRushInboxApi inbox;
+        private static GRushTradeApi trade;
 
         public static IGRushBackend Backend
         {
@@ -50,6 +62,27 @@ namespace GRushSdk
         public static bool IsLocaleAvailable
         {
             get { return IsAvailable && Backend.ProtocolVersion >= LocaleProtocolVersion; }
+        }
+
+        /// <summary>
+        /// 相手探しを呼べるか。false のランタイムでは <c>SampleAsync</c> が Unsupported になり、
+        /// <c>SetMineAsync</c> は rating を送らずに payload だけを書く。
+        /// </summary>
+        public static bool IsMatchmakingAvailable
+        {
+            get { return IsAvailable && Backend.ProtocolVersion >= MatchmakingProtocolVersion; }
+        }
+
+        /// <summary>受信箱を呼べるか。古いランタイムでは false。</summary>
+        public static bool IsInboxAvailable
+        {
+            get { return IsAvailable && Backend.ProtocolVersion >= InboxProtocolVersion; }
+        }
+
+        /// <summary>交換所を呼べるか。古いランタイムでは false。</summary>
+        public static bool IsTradeAvailable
+        {
+            get { return IsAvailable && Backend.ProtocolVersion >= TradeProtocolVersion; }
         }
 
         public static bool IsAvailable
@@ -129,6 +162,32 @@ namespace GRushSdk
             }
         }
 
+        /// <summary>受信箱。同じゲームのプレイヤーへ小さい構造化メッセージを送り、受け取る。</summary>
+        public static GRushInboxApi Inbox
+        {
+            get
+            {
+                if (inbox == null)
+                {
+                    inbox = new GRushInboxApi();
+                }
+                return inbox;
+            }
+        }
+
+        /// <summary>交換所。アイテムを出品し、同じゲームの別のプレイヤーが受ける。</summary>
+        public static GRushTradeApi Trade
+        {
+            get
+            {
+                if (trade == null)
+                {
+                    trade = new GRushTradeApi();
+                }
+                return trade;
+            }
+        }
+
         public static void UseBackend(IGRushBackend replacement)
         {
             var previous = backend as IGRushLocaleBackend;
@@ -142,6 +201,8 @@ namespace GRushSdk
             playerState = null;
             share = null;
             locale = null;
+            inbox = null;
+            trade = null;
             backend = replacement ?? GRushBackendFactory.Create();
         }
 

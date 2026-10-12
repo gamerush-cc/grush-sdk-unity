@@ -39,10 +39,65 @@ namespace GRushSdk
         /// 自分の状態を書く。<paramref name="payloadJson"/> は JSON オブジェクトの
         /// 生文字列（4KB 以下）。<paramref name="baseRevision"/> に 0 以上を渡すと
         /// 楽観ロックになり、他所で更新されていれば <c>InvalidParams</c> で戻る。
+        /// rating は今の値のまま変えない。
         /// </summary>
-        public async Task<GRushResult<GRushPlayerStatePage>> SetMineAsync(
+        public Task<GRushResult<GRushPlayerStatePage>> SetMineAsync(
             string payloadJson,
             int baseRevision
+        )
+        {
+            return WriteMineAsync(payloadJson, baseRevision, false, null);
+        }
+
+        /// <summary>
+        /// 自分の状態と、相手探しに使う rating（-1e9 より大きく 1e9 より小さい数値）を書く。
+        /// <paramref name="rating"/> に null を渡すと rating を消す。
+        /// <see cref="GRush.IsMatchmakingAvailable"/> が false の古いランタイムでは rating を送らず、
+        /// payload だけを書く。
+        /// </summary>
+        public Task<GRushResult<GRushPlayerStatePage>> SetMineAsync(
+            string payloadJson,
+            int baseRevision,
+            double? rating
+        )
+        {
+            return WriteMineAsync(payloadJson, baseRevision, GRush.IsMatchmakingAvailable, rating);
+        }
+
+        /// <summary>
+        /// 相手探し。同じゲームの他プレイヤーの公開状態をランダムに返す（既定 10 件）。
+        /// 自分と運営が伏せた状態は返らず、名前も返らない。
+        /// <see cref="GRush.IsMatchmakingAvailable"/> が false なら Unsupported。
+        /// </summary>
+        public Task<GRushResult<GRushPlayerStatePage>> SampleAsync()
+        {
+            return SampleCoreAsync(0, false, 0, 0);
+        }
+
+        /// <summary><paramref name="count"/> は 1〜20。</summary>
+        public Task<GRushResult<GRushPlayerStatePage>> SampleAsync(int count)
+        {
+            return SampleCoreAsync(count, false, 0, 0);
+        }
+
+        /// <summary>
+        /// rating が <paramref name="minRating"/> 以上 <paramref name="maxRating"/> 以下の状態から
+        /// 引く。範囲を渡すと、rating の無い状態は返らない。
+        /// </summary>
+        public Task<GRushResult<GRushPlayerStatePage>> SampleAsync(
+            int count,
+            double minRating,
+            double maxRating
+        )
+        {
+            return SampleCoreAsync(count, true, minRating, maxRating);
+        }
+
+        private static async Task<GRushResult<GRushPlayerStatePage>> WriteMineAsync(
+            string payloadJson,
+            int baseRevision,
+            bool sendRating,
+            double? rating
         )
         {
             if (!GRush.IsPlayerStateAvailable)
@@ -51,9 +106,27 @@ namespace GRushSdk
             }
             var response = await GRush.CallAsync(
                 "playerState.setMine",
-                GRushWire.PlayerStateParams(payloadJson, baseRevision)
+                GRushWire.PlayerStateParams(payloadJson, baseRevision, sendRating, rating)
             );
             return ToSingle(response);
+        }
+
+        private static async Task<GRushResult<GRushPlayerStatePage>> SampleCoreAsync(
+            int count,
+            bool hasRange,
+            double minRating,
+            double maxRating
+        )
+        {
+            if (!GRush.IsMatchmakingAvailable)
+            {
+                return GRushResult<GRushPlayerStatePage>.Unsupported();
+            }
+            var response = await GRush.CallAsync(
+                "playerState.sample",
+                GRushWire.SampleParams(count, hasRange, minRating, maxRating)
+            );
+            return ToList(response);
         }
 
         /// <summary>
@@ -70,6 +143,11 @@ namespace GRushSdk
                 "playerState.get",
                 GRushWire.PlayerStateQuery(pseudoIds)
             );
+            return ToList(response);
+        }
+
+        private static GRushResult<GRushPlayerStatePage> ToList(GRushResult<string> response)
+        {
             if (!response.Ok)
             {
                 return GRushResult<GRushPlayerStatePage>.Failure(response.Code, response.Message);
