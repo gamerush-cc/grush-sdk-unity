@@ -37,8 +37,18 @@ namespace GRushSdk
             GRushMockLocale.Set(locale, source, languages);
         }
 
+        /// <summary>
+        /// モックが受けた分析イベント。GameRush へ渡すのと同じ形の JSON で、直近の 200 件を古い順に返す。
+        /// Reset で空になる。
+        /// </summary>
+        public static string[] AnalyticsEvents
+        {
+            get { return GRushMockAnalytics.Snapshot(); }
+        }
+
         public static void Reset()
         {
+            GRushMockAnalytics.Reset();
             GRushMockLocale.Reset();
             GRushMockHub.Reset();
         }

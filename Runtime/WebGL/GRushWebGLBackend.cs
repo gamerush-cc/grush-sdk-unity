@@ -7,7 +7,11 @@ using AOT;
 
 namespace GRushSdk
 {
-    internal sealed class GRushWebGLBackend : IGRushBackend, IGRushShareBackend, IGRushLocaleBackend
+    internal sealed class GRushWebGLBackend
+        : IGRushBackend,
+            IGRushShareBackend,
+            IGRushLocaleBackend,
+            IGRushAnalyticsBackend
     {
         private delegate void RpcCallback(int requestId, int ok, IntPtr json, int length);
         private delegate void NetCallback(
@@ -127,6 +131,16 @@ namespace GRushSdk
             {
                 GRushJsLocaleSubscribe(LocaleHandler);
             }
+        }
+
+        public bool IsAnalyticsAvailable
+        {
+            get { return GRushWebGLAnalytics.IsAvailable(); }
+        }
+
+        public bool LogAnalytics(GRushAnalyticsEvent analyticsEvent)
+        {
+            return GRushWebGLAnalytics.Log(analyticsEvent);
         }
 
         private static void EnsureInitialized()
