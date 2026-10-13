@@ -187,7 +187,16 @@ namespace GRushSdk.Editor
                 newGameConfirmRights,
                 EditorStyles.wordWrappedLabel
             );
-            var ready = newGameTitle.Trim().Length > 0 && newGameConfirmRights;
+            newGameDeclareAllAges = EditorGUILayout.ToggleLeft(
+                "本投稿ゲームが、本サービス利用規約 §9 およびゲーム掲載ポリシーに定める全年齢向けの内容であることを申告します。",
+                newGameDeclareAllAges,
+                EditorStyles.wordWrappedLabel
+            );
+            // 全年齢向けの申告は、非公開で作るときだけ GameRush が求めない。
+            var ready =
+                newGameTitle.Trim().Length > 0
+                && newGameConfirmRights
+                && (VisibilityValues[newGameVisibility] == "private" || newGameDeclareAllAges);
             using (new EditorGUI.DisabledScope(busy || !ready))
             {
                 if (GUILayout.Button("作成する（再試行はしません）"))

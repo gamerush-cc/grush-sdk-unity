@@ -42,6 +42,7 @@ namespace GRushSdk.Editor
         private GUIStyle howToPlayStyle;
         private int newGameVisibility;
         private bool newGameConfirmRights;
+        private bool newGameDeclareAllAges;
         private string buildDirectory = "";
         private GRushBuildManifest manifest;
         private Vector2 scroll;
