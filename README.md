@@ -152,7 +152,7 @@ if (result.Ok && result.Value.TryGet("item", out var item) && OwnsItem(item))
 
 **値を信用しない。** リンクは誰でも作れる。アイテムが存在するか・プレイヤーが持っているか・ステージが解放済みかをゲームの側で確かめ、確かめられなければ無視する。
 
-`GRushLaunch` は `Params`（`IReadOnlyDictionary<string, string>`）と `TryGet(key, out value)` を持つ。キーは英数字と `_-` で 32 文字まで（`__proto__` は使えない）、値は英数字と `._~:,-` で 128 文字まで（空も可）、8 個まで。形の合わない項目は GameRush が落とし、8 個を超えたら全部落とす。渡るのは、プレイヤーが最初に開いたスライドのゲームだけで、別のゲームへスワイプして戻ったときは `Params` が空。フィードではページを読み直すと空になるが、単体表示や埋め込みでは読み直すと同じ値がまた渡ることがあるので、何度渡っても困らないように書く。`GetAsync` は GameRush から届くまで待ち、`GRush.Launch.Current` は届く前なら `null`。`GRush.IsLaunchAvailable` が `false`（`protocolVersion` 8 未満）と GameRush の外では `GetAsync` が `Unsupported`、`Current` が `null`。
+`GRushLaunch` は `Params`（`IReadOnlyDictionary<string, string>`）と `TryGet(key, out value)` を持つ。キーは英数字と `_-` で 32 文字まで（`__proto__` は使えない）、値は英数字と `._~:,-` で 128 文字まで（空も可）、8 個まで。形の合わない項目と、2回書かれたキーは GameRush が落とし、8 個を超えたら全部落とす。渡るのは、プレイヤーが最初に開いたスライドのゲームだけで、別のゲームへスワイプして戻ったときは `Params` が空。フィードではページを読み直すと空になるが、単体表示や埋め込みでは読み直すと同じ値がまた渡ることがあるので、何度渡っても困らないように書く。`GetAsync` は GameRush から届くまで待ち、`GRush.Launch.Current` は届く前なら `null`。`GRush.IsLaunchAvailable` が `false`（`protocolVersion` 8 未満）と GameRush の外では `GetAsync` が `Unsupported`、`Current` が `null`。GameRush のアプリ側が古くて答えられないときは、`Unsupported` ではなく空の `Params` が返る。
 
 ### アナリティクス
 
