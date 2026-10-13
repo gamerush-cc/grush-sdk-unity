@@ -7,7 +7,7 @@ GameRush の GameAPI を Unity から呼ぶための UPM パッケージ。ビ�
 Package Manager の `Add package from git URL...` に次を入れる。
 
 ```text
-https://github.com/gamerush-cc/grush-sdk-unity.git#v1.6.0
+https://github.com/gamerush-cc/grush-sdk-unity.git#v1.7.0
 ```
 
 Unity 2021.3 以降。ビルドターゲットは WebGL。
@@ -184,7 +184,7 @@ opponent.Received += message => opponent.Send(reply, GRushChannel.Unreliable, GR
 
 アナリティクスのモックは、GameRush と同じ検査をして、通ったイベントを1件ずつ Console に出し、直近の 200 件を `GRushMock.AnalyticsEvents`（GameRush へ渡すのと同じ形の JSON の配列）で返す（`GRushMock.Reset()` で空になる）。弾いたイベントは、GameRush と同じく理由ごとに1回だけ警告する（`GRushMock.Reset()` でまた出る）。どこへも送らない。前面に出るまでの 30 件の溜め・本体の上限・同じステップを最初の1回だけ残す扱い・セッションあたりの上限は再現しないので、モックでは `true` の分がすべて記録に残る。モックが名乗る `protocolVersion` は 7。
 
-相手探し・受信箱・交換所のモックは、`GRushMock.Rivals` の 3 人の相手を持つ。相手はそれぞれ rating 付きの公開プレイヤー状態を持ち、届いたメッセージを同じ kind と payload で送り返す。はじめと `GRushMock.Reset()` の後は、最初の相手からのメッセージ1通と、相手の受付中の出品を2件持つ。payload・offer・want・give の形、`operationId` での冪等、受付中の出品の上限、受諾の `Outcome`、`Pending` と Ack は GameRush と同じ規則で動く。通報を承諾すると（`GRushMock.ConfirmInboxReport` / `ConfirmTradeReport`、既定 `true`）相手をブロックし、その相手のメッセージと出品は見えなくなる。
+相手探し・受信箱・交換所のモックは、`GRushMock.Rivals` の 3 人の相手を持つ。相手はそれぞれ rating 付きの公開プレイヤー状態を持ち、届いたメッセージを同じ kind と payload で送り返す。はじめと `GRushMock.Reset()` の後は、最初の相手からのメッセージ1通と、相手の受付中の出品を2件持つ。payload・offer・want・give の形、`operationId` での冪等、受付中の出品の上限、受諾の `Outcome`、`Pending` と Ack は GameRush と同じ規則で動く。通報を承諾すると（`GRushMock.ConfirmInboxReport` / `ConfirmTradeReport`、既定 `true`）相手をブロックし、その相手のメッセージと出品は見えなくなる。プレイヤー状態の通報は伏せていない状態にだけ届き、確認の答えを `GRushMock.ConfirmPlayerStateReport`（既定 `true`）で決める。
 
 ```csharp
 GRushMockInbox.Receive(GRushMock.Rivals[0], "battleResult", "{\"stage\":3,\"win\":false}");

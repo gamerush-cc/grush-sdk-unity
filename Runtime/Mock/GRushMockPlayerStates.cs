@@ -66,6 +66,38 @@ namespace GRushSdk
             return pseudoId != null && states.ContainsKey(pseudoId);
         }
 
+        internal static bool IsVisible(string pseudoId)
+        {
+            Entry entry;
+            return pseudoId != null && states.TryGetValue(pseudoId, out entry) && !entry.Hidden;
+        }
+
+        /// <summary>
+        /// 通報は伏せていない相手の状態にだけ届く。確認でプレイヤーが押す答えは
+        /// <see cref="GRushMock.ConfirmPlayerStateReport"/> で決める。
+        /// </summary>
+        internal static GRushRpcResponse HandleReport(string paramsJson)
+        {
+            if (!GRushMock.SignedIn)
+            {
+                return GRushRpcResponse.Failure(GRushErrorCode.SignInRequired, "Reporting requires sign-in.");
+            }
+            var members = GRushMockJson.Members(paramsJson);
+            string pseudoId = null;
+            string raw;
+            if (members != null && members.TryGetValue("pseudoId", out raw))
+            {
+                GRushMockJson.TryString(raw, out pseudoId);
+            }
+            if (!IsVisible(pseudoId))
+            {
+                return GRushRpcResponse.Failure(GRushErrorCode.InvalidParams, "No player state for that id.");
+            }
+            return GRushRpcResponse.Success(
+                GRushMock.ConfirmPlayerStateReport ? "{\"reported\":true}" : "{\"reported\":false}"
+            );
+        }
+
         internal static bool IsRating(double value)
         {
             return !double.IsNaN(value)

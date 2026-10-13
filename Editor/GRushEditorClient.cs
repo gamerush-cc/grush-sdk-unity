@@ -23,6 +23,7 @@ namespace GRushSdk.Editor
         /// 手元の dev サーバへ向けるときだけ <c>GRUSH_API_ORIGIN</c> を使う。
         /// トークンは接続先ごとに別物なので、保存したものと接続先が食い違えば
         /// ログインし直しになる。
+        /// 以前の本番の接続先を指定したときは ProductionOrigin に読み替える。
         /// </summary>
         public static string DefaultOrigin()
         {
@@ -31,7 +32,7 @@ namespace GRushSdk.Editor
             {
                 return ProductionOrigin;
             }
-            return configured.TrimEnd('/');
+            return CanonicalOrigin(configured.TrimEnd('/'));
         }
 
         /// <summary>
