@@ -63,7 +63,7 @@ if (inbox.Ok)
 
 同じゲームの疑似 ID 宛てに、小さい構造化メッセージ（非同期対戦の結果の通知など）を送る。ゲストも送受信できる。**payload で文章や画像は送れない。** payload は JSON オブジェクトで、文字列の値とキーは識別子（`^[A-Za-z0-9_.:-]{1,32}$`）だけ、ほかは数値・真偽値・null。入れ子は最上位を 1 段目として 4 段まで、値は合計 64 個まで、詰めた JSON で 1KB まで。`kind` は `^[A-Za-z0-9._:-]{1,32}$`。合わなければ `InvalidParams`。利用者どうしの文章や画像のやりとりには使わない。
 
-`ListAsync(unreadOnly, limit, cursor)` は新しい順（`limit` は 1〜50、0 なら 20）。続きは `NextCursor` を渡して読む。`MarkReadAsync` / `RemoveAsync` は 1 回 50 件まで。`ReportAsync(messageId)` は GameRush が確認を出し、承諾されたら `true`。通報すると送り手をブロックし、その相手のメッセージと出品は見えなくなる。ゲストは `SignInRequired`。`GRush.IsInboxAvailable` が `false`（`protocolVersion` 7 未満）ではどれも `Unsupported`。
+`ListAsync(unreadOnly, limit, cursor)` は新しい順（`limit` は 1〜50、0 なら 20）。続きは `NextCursor` を渡して読む。`MarkReadAsync` / `RemoveAsync` は 1 回 50 件まで。同じゲームの疑似 ID でない宛先は `InvalidParams`、送りすぎ（毎時・毎日の上限）は `RateLimited` で、時間が経てば回復する。`ReportAsync(messageId)` は GameRush が確認を出し、承諾されたら `true`。通報すると送り手をブロックし、その相手のメッセージと出品は見えなくなる。ゲストは `SignInRequired`。`GRush.IsInboxAvailable` が `false`（`protocolVersion` 7 未満）ではどれも `Unsupported`。
 
 ### 交換所
 
