@@ -12,6 +12,24 @@ namespace GRushSdk
         public static bool ShareAvailable = true;
         public static GRushShareStatus ShareStatus = GRushShareStatus.Opened;
 
+        /// <summary>受信箱の通報の確認でプレイヤーが押す答え。</summary>
+        public static bool ConfirmInboxReport = true;
+
+        /// <summary>交換所の通報の確認でプレイヤーが押す答え。</summary>
+        public static bool ConfirmTradeReport = true;
+
+        private static readonly string[] rivals = { "mock-rival-1", "mock-rival-2", "mock-rival-3" };
+
+        /// <summary>
+        /// モックの相手の疑似 ID。それぞれ rating 付きの公開プレイヤー状態を持ち、届いたメッセージを
+        /// 同じ kind と payload で送り返す。はじめと <see cref="Reset"/> の後は、最初の相手からの
+        /// メッセージ1通と、受付中の出品を2件持つ。
+        /// </summary>
+        public static string[] Rivals
+        {
+            get { return (string[])rivals.Clone(); }
+        }
+
         public static GRushMockPeer AddPeer(string displayName)
         {
             return AddPeer(displayName, null);
@@ -46,11 +64,14 @@ namespace GRushSdk
             get { return GRushMockAnalytics.Snapshot(); }
         }
 
+        /// <summary>表示言語・部屋・分析イベント・受信箱・交換所（通報によるブロックを含む）をはじめの状態へ戻す。</summary>
         public static void Reset()
         {
             GRushMockAnalytics.Reset();
             GRushMockLocale.Reset();
             GRushMockHub.Reset();
+            GRushMockInbox.Reset();
+            GRushMockTrades.Reset();
         }
     }
 
