@@ -143,6 +143,8 @@ namespace GRushSdk
                     return SetPlayerState(paramsJson);
                 case "playerState.get":
                     return GRushRpcResponse.Success(GRushMockPlayerStates.GetJson(paramsJson));
+                case "playerState.report":
+                    return GRushMockPlayerStates.HandleReport(paramsJson);
                 case "playerState.sample":
                     return Sample(paramsJson);
                 case "inbox.send":

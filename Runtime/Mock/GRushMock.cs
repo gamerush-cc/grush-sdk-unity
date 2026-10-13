@@ -18,6 +18,9 @@ namespace GRushSdk
         /// <summary>交換所の通報の確認でプレイヤーが押す答え。</summary>
         public static bool ConfirmTradeReport = true;
 
+        /// <summary>プレイヤー状態の通報の確認でプレイヤーが押す答え。</summary>
+        public static bool ConfirmPlayerStateReport = true;
+
         private static readonly string[] rivals = { "mock-rival-1", "mock-rival-2", "mock-rival-3" };
 
         /// <summary>
