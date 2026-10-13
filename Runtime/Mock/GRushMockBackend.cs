@@ -7,6 +7,7 @@ namespace GRushSdk
         : IGRushBackend,
             IGRushShareBackend,
             IGRushLocaleBackend,
+            IGRushLaunchBackend,
             IGRushAnalyticsBackend
     {
         private const string PseudoIdKey = "grush.mock.pseudoId";
@@ -21,10 +22,10 @@ namespace GRushSdk
             get { return true; }
         }
 
-        // モックが実装している一番新しい機能（相手探し・受信箱・交換所）の版数。
+        // モックが実装している一番新しい機能（起動パラメータ）の版数。
         public int ProtocolVersion
         {
-            get { return GRush.TradeProtocolVersion; }
+            get { return GRush.LaunchProtocolVersion; }
         }
 
         public bool IsAnalyticsAvailable
@@ -76,6 +77,36 @@ namespace GRushSdk
         public void SetNetEventHandler(Action<GRushNetEvent> handler)
         {
             netHandler = handler;
+        }
+
+        public string LaunchCurrentJson()
+        {
+            return LaunchJson();
+        }
+
+        // Web の層と同じく entries の配列で渡す。
+        private static string LaunchJson()
+        {
+            var builder = new System.Text.StringBuilder("{\"entries\":[");
+            var first = true;
+            if (GRushMock.LaunchParams != null)
+            {
+                foreach (var pair in GRushMock.LaunchParams)
+                {
+                    if (pair.Key == null || pair.Value == null)
+                    {
+                        continue;
+                    }
+                    if (!first)
+                    {
+                        builder.Append(',');
+                    }
+                    first = false;
+                    builder.Append("{\"key\":").Append(GRushWire.Escape(pair.Key));
+                    builder.Append(",\"value\":").Append(GRushWire.Escape(pair.Value)).Append('}');
+                }
+            }
+            return builder.Append("]}").ToString();
         }
 
         public string LocaleCurrentJson()
@@ -173,6 +204,8 @@ namespace GRushSdk
                     return GRushMockTrades.HandleReport(paramsJson, PseudoId);
                 case "locale.get":
                     return GRushRpcResponse.Success(GRushMockLocale.CurrentJson());
+                case "launch.get":
+                    return GRushRpcResponse.Success(LaunchJson());
                 case "share.getAvailability":
                     return GRushRpcResponse.Success(
                         GRushMock.ShareAvailable ? "{\"available\":true}" : "{\"available\":false}"

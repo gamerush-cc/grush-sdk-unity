@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace GRushSdk
 {
@@ -20,6 +21,12 @@ namespace GRushSdk
 
         /// <summary>プレイヤー状態の通報の確認でプレイヤーが押す答え。</summary>
         public static bool ConfirmPlayerStateReport = true;
+
+        /// <summary>
+        /// <see cref="GRush.Launch"/> が返す起動パラメータ（<c>gp.</c> を除いたキーと値）。
+        /// GameRush の制限（キー・値の形と 8 個まで）では確かめずにそのまま返す。<see cref="Reset"/> で空になる。
+        /// </summary>
+        public static Dictionary<string, string> LaunchParams = new Dictionary<string, string>();
 
         private static readonly string[] rivals = { "mock-rival-1", "mock-rival-2", "mock-rival-3" };
 
@@ -76,9 +83,13 @@ namespace GRushSdk
             get { return GRushMockAnalytics.Snapshot(); }
         }
 
-        /// <summary>表示言語・部屋・分析イベント・受信箱・交換所（通報によるブロックを含む）をはじめの状態へ戻す。</summary>
+        /// <summary>
+        /// 表示言語・起動パラメータ・部屋・分析イベント・受信箱・交換所（通報によるブロックを含む）を
+        /// はじめの状態へ戻す。
+        /// </summary>
         public static void Reset()
         {
+            LaunchParams = new Dictionary<string, string>();
             GRushMockAnalytics.Reset();
             GRushMockLocale.Reset();
             GRushMockHub.Reset();

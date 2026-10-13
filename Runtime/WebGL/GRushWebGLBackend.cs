@@ -11,6 +11,7 @@ namespace GRushSdk
         : IGRushBackend,
             IGRushShareBackend,
             IGRushLocaleBackend,
+            IGRushLaunchBackend,
             IGRushAnalyticsBackend
     {
         private delegate void RpcCallback(int requestId, int ok, IntPtr json, int length);
@@ -53,6 +54,9 @@ namespace GRushSdk
 
         [DllImport("__Internal")]
         private static extern void GRushJsLocaleSubscribe(LocaleCallback onLocale);
+
+        [DllImport("__Internal")]
+        private static extern string GRushJsLaunchCurrent();
 
         private static readonly LocaleCallback LocaleHandler = OnLocale;
         private static Action<string> localeHandler;
@@ -131,6 +135,11 @@ namespace GRushSdk
             {
                 GRushJsLocaleSubscribe(LocaleHandler);
             }
+        }
+
+        public string LaunchCurrentJson()
+        {
+            return GRushJsLaunchCurrent();
         }
 
         public bool IsAnalyticsAvailable

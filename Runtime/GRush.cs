@@ -20,6 +20,9 @@ namespace GRushSdk
         /// <summary>交換所（<see cref="Trade"/>）に要る版数。</summary>
         public const int TradeProtocolVersion = 7;
 
+        /// <summary>起動パラメータ（<see cref="Launch"/>）に要る版数。</summary>
+        public const int LaunchProtocolVersion = 8;
+
         public const int MaxMessageBytes = 8 * 1024;
 
         private static IGRushBackend backend;
@@ -32,6 +35,7 @@ namespace GRushSdk
         private static GRushAnalyticsApi analytics;
         private static GRushInboxApi inbox;
         private static GRushTradeApi trade;
+        private static GRushLaunchApi launch;
 
         public static IGRushBackend Backend
         {
@@ -91,6 +95,12 @@ namespace GRushSdk
         public static bool IsTradeAvailable
         {
             get { return IsAvailable && Backend.ProtocolVersion >= TradeProtocolVersion; }
+        }
+
+        /// <summary>起動パラメータを読めるか。古いランタイムと GameRush の外では false。</summary>
+        public static bool IsLaunchAvailable
+        {
+            get { return IsAvailable && Backend.ProtocolVersion >= LaunchProtocolVersion; }
         }
 
         public static bool IsAvailable
@@ -209,6 +219,22 @@ namespace GRushSdk
             }
         }
 
+        /// <summary>
+        /// 起動パラメータ。GameRush の URL に <c>gp.</c> を付けて載せたキーと値で、シェアしたリンクから
+        /// 特定のアイテムやステージへ飛ばすのに使う。値は信用せず、ゲームの側で確かめてから使う。
+        /// </summary>
+        public static GRushLaunchApi Launch
+        {
+            get
+            {
+                if (launch == null)
+                {
+                    launch = new GRushLaunchApi();
+                }
+                return launch;
+            }
+        }
+
         public static void UseBackend(IGRushBackend replacement)
         {
             var previous = backend as IGRushLocaleBackend;
@@ -225,6 +251,7 @@ namespace GRushSdk
             analytics = null;
             inbox = null;
             trade = null;
+            launch = null;
             backend = replacement ?? GRushBackendFactory.Create();
         }
 

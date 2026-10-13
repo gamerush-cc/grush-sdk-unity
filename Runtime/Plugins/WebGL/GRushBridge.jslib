@@ -13,6 +13,22 @@ var GRushBridgeLibrary = {
       return GRushBridge.api("GRushLocale") || GRushBridge.api("GameRushLocale");
     },
 
+    launchApi: function () {
+      return GRushBridge.api("GRushLaunch") || GRushBridge.api("GameRushLaunch");
+    },
+
+    // JsonUtility cannot read a dictionary, so the params travel as an array of key and value pairs.
+    launchEntries: function (launch) {
+      var params = launch && launch.params;
+      var entries = [];
+      if (params && typeof params === "object") {
+        Object.keys(params).forEach(function (key) {
+          if (typeof params[key] === "string") entries.push({ key: key, value: params[key] });
+        });
+      }
+      return { entries: entries };
+    },
+
     respond: function (requestId, ok, text) {
       if (!GRushBridge.onRpc) return;
       var size = lengthBytesUTF8(text) + 1;
@@ -249,6 +265,8 @@ var GRushBridgeLibrary = {
       }
       var locale = GRushBridge.localeApi();
       if (method === "locale.get" && locale) return locale.get();
+      var launch = GRushBridge.launchApi();
+      if (method === "launch.get" && launch) return launch.get().then(GRushBridge.launchEntries);
       var share = GRushBridge.api("GRushShare");
       if (method === "share.open" && share) return share.share(args);
       if (method === "share.getAvailability" && share) {
@@ -329,6 +347,17 @@ var GRushBridgeLibrary = {
     return ptr;
   },
   GRushJsLocaleCurrent__deps: ["$GRushBridge", "malloc"],
+
+  GRushJsLaunchCurrent: function () {
+    var launch = GRushBridge.launchApi();
+    var snapshot = launch ? launch.current() : null;
+    var text = snapshot ? JSON.stringify(GRushBridge.launchEntries(snapshot)) : "";
+    var size = lengthBytesUTF8(text) + 1;
+    var ptr = _malloc(size);
+    stringToUTF8(text, ptr, size);
+    return ptr;
+  },
+  GRushJsLaunchCurrent__deps: ["$GRushBridge", "malloc"],
 
   GRushJsLocaleSubscribe: function (onLocale) {
     var locale = GRushBridge.localeApi();
