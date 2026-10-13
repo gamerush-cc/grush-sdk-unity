@@ -22,10 +22,10 @@ namespace GRushSdk
             get { return true; }
         }
 
-        // モックが実装している一番新しい機能（起動パラメータ）の版数。
+        // モックが実装している一番新しい機能（共有に添える起動パラメータ）の版数。
         public int ProtocolVersion
         {
-            get { return GRush.LaunchProtocolVersion; }
+            get { return GRush.ShareLaunchProtocolVersion; }
         }
 
         public bool IsAnalyticsAvailable
@@ -59,10 +59,71 @@ namespace GRushSdk
                         : "{\"status\":\"cancelled\"}"
                 )
                 : GRushRpcResponse.Failure(GRushErrorCode.Unavailable, "Sharing is unavailable here.");
+            // GameRush は親へ送る前に起動パラメータを確かめるので、共有できない環境でも invalidParams が先に返る。
+            if (!ShareLaunchParamsValid(paramsJson))
+            {
+                response = GRushRpcResponse.Failure(GRushErrorCode.InvalidParams, "Invalid launch params.");
+            }
             if (onDone != null)
             {
                 GRushDispatcher.Post(() => onDone(response));
             }
+        }
+
+        // 共有に添える起動パラメータを GameRush と同じ規則で確かめる。読む側と違い、1つでも合わなければ共有ごと拒む。
+        private static bool ShareLaunchParamsValid(string paramsJson)
+        {
+            var members = GRushMockJson.Members(paramsJson);
+            string raw;
+            if (members == null || !members.TryGetValue("launchParams", out raw) || GRushMockJson.IsNull(raw))
+            {
+                return true;
+            }
+            var entries = GRushMockJson.Members(raw);
+            if (entries == null || entries.Count > MaxShareLaunchParams)
+            {
+                return false;
+            }
+            foreach (var entry in entries)
+            {
+                string value;
+                if (!IsShareLaunchKey(entry.Key) || !GRushMockJson.TryString(entry.Value, out value))
+                {
+                    return false;
+                }
+                if (value.Length > 128 || !IsShareLaunchText(value, "._~:,-"))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private const int MaxShareLaunchParams = 8;
+
+        private static bool IsShareLaunchKey(string key)
+        {
+            return !string.IsNullOrEmpty(key)
+                && key.Length <= 32
+                && key != "__proto__"
+                && IsShareLaunchText(key, "_-");
+        }
+
+        private static bool IsShareLaunchText(string text, string symbols)
+        {
+            foreach (var c in text)
+            {
+                var ok =
+                    (c >= 'A' && c <= 'Z')
+                    || (c >= 'a' && c <= 'z')
+                    || (c >= '0' && c <= '9')
+                    || symbols.IndexOf(c) >= 0;
+                if (!ok)
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         public void Send(byte[] payload, int count, GRushChannel channel, int to)
