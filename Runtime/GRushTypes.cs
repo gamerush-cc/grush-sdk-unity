@@ -42,6 +42,16 @@ namespace GRushSdk
     }
 
     /// <summary>
+    /// 部屋が1通を捨てた理由。Code は "messageTooLarge"・"rateLimited"・"badFrame" で、
+    /// ここに無い値が届くこともある。
+    /// </summary>
+    public struct GRushRoomError
+    {
+        public string Code;
+        public string Message;
+    }
+
+    /// <summary>
     /// 他プレイヤーへ見える公開状態のメタ情報。
     ///
     /// **payload はここに入らない。** 任意形状の JSON は

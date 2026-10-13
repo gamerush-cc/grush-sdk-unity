@@ -46,6 +46,13 @@ namespace GRushSdk
         public event Action<int> PeerLeft;
         public event Action<int> HostChanged;
         public event Action<string> TransportChanged;
+
+        /// <summary>
+        /// 部屋が1通を捨てたときの通知。部屋はつながったままで、続けて送れる。
+        /// 部屋が閉じるときは <see cref="Closed"/> だけが届く。
+        /// </summary>
+        public event Action<GRushRoomError> Error;
+
         public event Action<string> Closed;
 
         internal GRushRoom(GRushNetApi owner, GRushJoinWire wire)
@@ -157,10 +164,26 @@ namespace GRushSdk
                     transport = netEvent.Detail;
                     Raise(TransportChanged, netEvent.Detail);
                     return;
+                case GRushNetEventKind.Error:
+                    ApplyError(netEvent.Detail);
+                    return;
                 case GRushNetEventKind.Close:
                     MarkClosed(netEvent.Detail);
                     return;
             }
+        }
+
+        private void ApplyError(string json)
+        {
+            var wire = GRushWire.Parse<GRushErrorWire>(json);
+            if (wire == null)
+            {
+                return;
+            }
+            Raise(
+                Error,
+                new GRushRoomError { Code = wire.code ?? string.Empty, Message = wire.message ?? string.Empty }
+            );
         }
 
         private void RaiseMessage(GRushNetEvent netEvent)

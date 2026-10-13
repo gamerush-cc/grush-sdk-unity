@@ -129,6 +129,30 @@ namespace GRushSdk
             Announce(member, GRushNetEventKind.PeerLeave);
         }
 
+        public bool RaiseError(string code, string message)
+        {
+            var detail =
+                "{\"code\":"
+                + GRushWire.Escape(code ?? string.Empty)
+                + ",\"message\":"
+                + GRushWire.Escape(message ?? string.Empty)
+                + "}";
+            var delivered = false;
+            foreach (var member in members.ToArray())
+            {
+                if (member.Peer != null || member.Deliver == null)
+                {
+                    continue;
+                }
+                var deliver = member.Deliver;
+                GRushDispatcher.Post(
+                    () => deliver(new GRushNetEvent { Kind = GRushNetEventKind.Error, Detail = detail })
+                );
+                delivered = true;
+            }
+            return delivered;
+        }
+
         public void Route(int from, byte[] payload, int count, GRushChannel channel, int to)
         {
             if (channel == GRushChannel.Unreliable && random.NextDouble() < GRushMock.UnreliableDropRate)

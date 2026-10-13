@@ -7,7 +7,7 @@ GameRush の GameAPI を Unity から呼ぶための UPM パッケージ。ビ�
 Package Manager の `Add package from git URL...` に次を入れる。
 
 ```text
-https://github.com/gamerush-cc/grush-sdk-unity.git#v1.7.0
+https://github.com/gamerush-cc/grush-sdk-unity.git#v1.8.0
 ```
 
 Unity 2021.3 以降。ビルドターゲットは WebGL。
@@ -28,9 +28,12 @@ if (joined.Ok)
 {
     var room = joined.Value;
     room.Message += message => Debug.Log(message.From);
+    room.Error += error => Debug.LogWarning(error.Code + ": " + error.Message);
     room.Send(payload, GRushChannel.Unreliable, GRushRoom.Everyone);
 }
 ```
+
+部屋が1通を捨てると `GRushRoom.Error` が届く。`Code` は `"messageTooLarge"`・`"rateLimited"`・`"badFrame"` で、ほかの値が届くこともある。部屋はつながったままで、続けて送れる。部屋が閉じるときは `Closed` だけが届く。
 
 `GRush` は例外を投げない。GameRush の外で動かした場合も `GRushResult<T>.Ok` が `false`、`Code` が `GRushErrorCode.Unsupported` になるだけで、ゲームは止まらない（アナリティクスは `bool` を返す。下記）。
 
@@ -177,6 +180,8 @@ opponent.Received += message => opponent.Send(reply, GRushChannel.Unreliable, GR
 ```
 
 `GRushMock.AddPeer` で作った相手は同じプロセス内の2人目の peer として部屋に入り、送受信が実際に往復する。
+
+`GRushMock.RaiseRoomError(code, message)` は、自分がいる部屋に `GRushRoom.Error` を届ける（次のフレーム以降に届き、部屋は閉じない）。部屋にいなければ `false` を返す。
 
 表示言語のモックは `GRushMock.SetLocale("en")`（`Source` は `user`）で切り替わり、`Changed` が飛ぶ。未設定なら `Application.systemLanguage` から写した値を `Source = "device"` で返す。
 

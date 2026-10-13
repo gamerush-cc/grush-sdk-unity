@@ -48,6 +48,15 @@ namespace GRushSdk
             GRushMockHub.Instance.RemovePeer(peer);
         }
 
+        /// <summary>
+        /// 自分がいる部屋に、部屋が1通を捨てたときの <see cref="GRushRoom.Error"/> を届ける。
+        /// 本番と同じく次のフレーム以降に届き、部屋は閉じない。部屋にいなければ何もせず false を返す。
+        /// </summary>
+        public static bool RaiseRoomError(string code, string message)
+        {
+            return GRushMockHub.Instance.RaiseError(code, message);
+        }
+
         public static void SetLocale(string locale)
         {
             GRushMockLocale.Set(locale, "user", null);

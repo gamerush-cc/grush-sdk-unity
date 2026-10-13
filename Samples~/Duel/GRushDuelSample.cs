@@ -45,6 +45,7 @@ public class GRushDuelSample : MonoBehaviour
         room.PeerJoined += peer => status = "Opponent joined: " + (peer.DisplayName ?? "guest");
         room.PeerLeft += index => status = "Opponent left (peer " + index + ").";
         room.TransportChanged += transport => status = "Transport is now " + transport + ".";
+        room.Error += error => Debug.LogWarning("Room dropped a message: " + error.Code);
         room.Closed += reason => status = "Room closed: " + reason;
         status = room.IsHost ? "You are the host." : "Waiting for the host.";
     }

@@ -28,6 +28,7 @@ namespace GRushSdk
         Host = 4,
         TransportChange = 5,
         Close = 6,
+        Error = 7,
     }
 
     public struct GRushNetEvent

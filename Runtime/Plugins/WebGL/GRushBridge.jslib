@@ -62,6 +62,12 @@ var GRushBridgeLibrary = {
         room.on("transportchange", function (event) {
           GRushBridge.emit(5, 0, 0, 0, null, String(event.transport || ""));
         }),
+        room.on("error", function (event) {
+          GRushBridge.emit(7, 0, 0, 0, null, JSON.stringify({
+            code: String((event && event.code) || ""),
+            message: String((event && event.message) || ""),
+          }));
+        }),
         room.on("close", function (event) {
           GRushBridge.emit(6, 0, 0, 0, null, String(event.reason || ""));
           if (GRushBridge.unbind) GRushBridge.unbind();
