@@ -7,7 +7,7 @@ GameRush の GameAPI を Unity から呼ぶための UPM パッケージ。ビ�
 Package Manager の `Add package from git URL...` に次を入れる。
 
 ```text
-https://github.com/gamerush-cc/grush-sdk-unity.git#v1.9.1
+https://github.com/gamerush-cc/grush-sdk-unity.git#v1.10.0
 ```
 
 Unity 2021.3 以降。ビルドターゲットは WebGL。
@@ -112,6 +112,19 @@ if (await GRush.Share.IsAvailableAsync())
 
 GameRush の確認シートが出て、プレイヤーが送り先を押したときに共有が開く。返るのは `GRushShareStatus.Opened` / `Cancelled` だけ。`ShareScreenAsync` はゲームの canvas のスクショを送る（画面に DOM で重ねた文字は写らない）。自前の画像を送るなら `ShareAsync(text, texture.EncodeToPNG())`。共有は 5 秒に 1 回までなので、1 回のボタン操作で呼ぶのはどちらか一方にする。共有したことを条件に報酬を出さない。本文は 100 文字までで、URL と @メンションを含むと `InvalidParams`。古い GameRush（`protocolVersion` 3 未満）では `Unsupported`。
 
+#### 起動パラメータを添える
+
+```csharp
+var launchParams = new Dictionary<string, string> { { "stage", "3" } };
+var shared = await GRush.Share.ShareScreenAsync("ステージ3に挑戦", launchParams);
+if (!shared.Ok && shared.Code == GRushErrorCode.Unsupported)
+{
+    shared = await GRush.Share.ShareScreenAsync("ステージ3に挑戦");
+}
+```
+
+`ShareAsync(text, image, launchParams)` と `ShareScreenAsync(text, launchParams)` は、共有リンクに `?gp.stage=3` のように起動パラメータを載せる。リンクを開いた人のゲームでは `GRush.Launch` に渡る（下の「起動パラメータ」）。キーと値の制限は「起動パラメータ」と同じで、1つでも合わなければ共有を開かずに `InvalidParams`。`null` と空の辞書は渡さないときと同じ。古い GameRush（`GRush.ProtocolVersion` が `GRush.ShareLaunchProtocolVersion`（9）未満）では、共有を開かずに `Unsupported` を返すので、起動パラメータを外して呼び直せば共有できる。**リンクは誰にでも見え、そのまま転送される。** プレイヤーを識別できる値（招待コードなど）を入れない。受け取る側のゲームは値を信用せず、確かめてから使う。
+
 ### 表示言語
 
 ```csharp
@@ -203,9 +216,9 @@ opponent.Received += message => opponent.Send(reply, GRushChannel.Unreliable, GR
 
 起動パラメータのモックは `GRushMock.LaunchParams`（既定は空。例 `GRushMock.LaunchParams["item"] = "sword";`）をそのまま返す。GameRush の制限では確かめない。`GRushMock.Reset()` で空になる。
 
-共有のモックは確認シートを出さず、`GRushMock.ShareStatus`（既定 `Opened`）を返す。`GRushMock.ShareAvailable = false` で共有できない環境を試せる。本文と画像の検査はしない。
+共有のモックは確認シートを出さず、`GRushMock.ShareStatus`（既定 `Opened`）を返す。`GRushMock.ShareAvailable = false` で共有できない環境を試せる。起動パラメータは GameRush と同じ制限で確かめ、合わなければ `InvalidParams`。本文と画像の検査はしない。
 
-アナリティクスのモックは、GameRush と同じ検査をして、通ったイベントを1件ずつ Console に出し、直近の 200 件を `GRushMock.AnalyticsEvents`（GameRush へ渡すのと同じ形の JSON の配列）で返す（`GRushMock.Reset()` で空になる）。弾いたイベントは、GameRush と同じく理由ごとに1回だけ警告する（`GRushMock.Reset()` でまた出る）。どこへも送らない。前面に出るまでの 30 件の溜め・本体の上限・同じステップを最初の1回だけ残す扱い・セッションあたりの上限は再現しないので、モックでは `true` の分がすべて記録に残る。モックが名乗る `protocolVersion` は 8。
+アナリティクスのモックは、GameRush と同じ検査をして、通ったイベントを1件ずつ Console に出し、直近の 200 件を `GRushMock.AnalyticsEvents`（GameRush へ渡すのと同じ形の JSON の配列）で返す（`GRushMock.Reset()` で空になる）。弾いたイベントは、GameRush と同じく理由ごとに1回だけ警告する（`GRushMock.Reset()` でまた出る）。どこへも送らない。前面に出るまでの 30 件の溜め・本体の上限・同じステップを最初の1回だけ残す扱い・セッションあたりの上限は再現しないので、モックでは `true` の分がすべて記録に残る。モックが名乗る `protocolVersion` は 9。
 
 相手探し・受信箱・交換所のモックは、`GRushMock.Rivals` の 3 人の相手を持つ。相手はそれぞれ rating 付きの公開プレイヤー状態を持ち、届いたメッセージを同じ kind と payload で送り返す。はじめと `GRushMock.Reset()` の後は、最初の相手からのメッセージ1通と、相手の受付中の出品を2件持つ。payload・offer・want・give の形、`operationId` での冪等、受付中の出品の上限、受諾の `Outcome`、`Pending` と Ack は GameRush と同じ規則で動く。通報を承諾すると（`GRushMock.ConfirmInboxReport` / `ConfirmTradeReport`、既定 `true`）相手をブロックし、その相手のメッセージと出品は見えなくなる。プレイヤー状態の通報は伏せていない状態にだけ届き、確認の答えを `GRushMock.ConfirmPlayerStateReport`（既定 `true`）で決める。
 

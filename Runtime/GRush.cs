@@ -23,6 +23,11 @@ namespace GRushSdk
         /// <summary>起動パラメータ（<see cref="Launch"/>）に要る版数。</summary>
         public const int LaunchProtocolVersion = 8;
 
+        /// <summary>
+        /// 共有に起動パラメータを添える（<c>Share.ShareAsync</c> と <c>ShareScreenAsync</c> の launchParams）のに要る版数。
+        /// </summary>
+        public const int ShareLaunchProtocolVersion = 9;
+
         public const int MaxMessageBytes = 8 * 1024;
 
         private static IGRushBackend backend;
