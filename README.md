@@ -7,7 +7,7 @@ GameRush の GameAPI を Unity から呼ぶための UPM パッケージ。ビ�
 Package Manager の `Add package from git URL...` に次を入れる。
 
 ```text
-https://github.com/gamerush-cc/grush-sdk-unity.git#v1.8.0
+https://github.com/gamerush-cc/grush-sdk-unity.git#v1.9.0
 ```
 
 Unity 2021.3 以降。ビルドターゲットは WebGL。
@@ -123,7 +123,7 @@ if (result.Ok)
 }
 ```
 
-`GRushLocale` は `Locale`（BCP 47 のタグ。`ja` や `zh-Hans`）、`Source`（`user` / `system` / `device`。今後増えても動くように書く）、`Languages`（優先順）を持つ。`GRush.Locale.Current` は取得済みなら同期で読め、無ければ `null`。`Changed` は次の `Update` で配られるので、取得の途中の変更を取りこぼさないよう `GetAsync` より先に購読する。`GRush.IsLocaleAvailable` が `false`（`protocolVersion` 4 未満）では `GetAsync` が `Unsupported` を返す。
+`GRushLocale` は `Locale`（BCP 47 のタグ。`ja` や `zh-Hans`）、`Source`（`user` / `system` / `device`。今後増えても動くように書く）、`Languages`（優先順）を持つ。`GRush.Locale.Current` は取得済みなら同期で読め、無ければ `null`。`Changed` は次の `Update` で配られるので、取得の途中の変更を取りこぼさないよう `GetAsync` より先に購読する。`GRush.IsLocaleAvailable` が `false`（`protocolVersion` 4 未満）では `GetAsync` が `Unsupported` を返す。`Source` は必ず入り、GameRush が渡さなければ `"device"`。`Languages` は null と空文字を除いた一覧で、空なら `[Locale]`。`GRush.UseBackend` でバックエンドを差し替えても、登録済みの `Changed` は新しいバックエンドの通知を受け続ける。
 
 ### アナリティクス
 
@@ -183,7 +183,7 @@ opponent.Received += message => opponent.Send(reply, GRushChannel.Unreliable, GR
 
 `GRushMock.RaiseRoomError(code, message)` は、自分がいる部屋に `GRushRoom.Error` を届ける（次のフレーム以降に届き、部屋は閉じない）。部屋にいなければ `false` を返す。
 
-表示言語のモックは `GRushMock.SetLocale("en")`（`Source` は `user`）で切り替わり、`Changed` が飛ぶ。未設定なら `Application.systemLanguage` から写した値を `Source = "device"` で返す。
+表示言語のモックは `GRushMock.SetLocale("en")`（`Source` は `user`）で切り替わり、`Changed` が飛ぶ。値が変わらない `SetLocale` では飛ばない。`SetLocale(locale, source, languages)` の `languages` の null と空文字は捨て、残りが無ければ端末の言語から決める。未設定なら `Application.systemLanguage` から写した値を `Source = "device"` で返す。
 
 共有のモックは確認シートを出さず、`GRushMock.ShareStatus`（既定 `Opened`）を返す。`GRushMock.ShareAvailable = false` で共有できない環境を試せる。本文と画像の検査はしない。
 

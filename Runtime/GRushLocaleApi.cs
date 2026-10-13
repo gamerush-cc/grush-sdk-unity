@@ -84,9 +84,19 @@ namespace GRushSdk
             return new GRushLocale
             {
                 Locale = wire.locale,
-                Source = wire.source ?? string.Empty,
-                Languages = wire.languages ?? new string[0],
+                Source = GRushLocaleDefaults.Source(wire.source),
+                Languages = GRushLocaleDefaults.Languages(wire.locale, wire.languages),
             };
+        }
+
+        // GRush.UseBackend の後に呼ぶ。登録済みの Changed を新しいバックエンドへつなぎ直す。
+        internal void Rebind()
+        {
+            subscribed = false;
+            if (changed != null)
+            {
+                Subscribe();
+            }
         }
 
         private void Subscribe()
