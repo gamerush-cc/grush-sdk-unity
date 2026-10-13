@@ -92,6 +92,8 @@ var mine = await GRush.Trade.MineAsync();
 
 `Pending` の `Action` は `ReceiveGive`（出品者が `GiveJson` を受け取る）・`ReturnOffer`（出品者が `OfferJson` を戻す。取り下げ・期限切れ・運営の非表示）・`ReceiveOffer`（受けた側が `OfferJson` を受け取る）。`Unknown` は反映せず、Ack もしない。
 
+受付中の出品が 10 件あるときの `CreateAsync` は `InvalidParams` で、待っても直らない（取り下げるか、成立・期限切れを待つ）。毎日 30 件の出品と毎時 30 件の受諾の上限は `RateLimited` で、時間が経てば回復する。
+
 **offer・want・give で文章や画像は送れない。** 形は受信箱の payload と同じで、大きさは詰めた JSON で offer 2KB・want 1KB・give 2KB まで。`OfferJson` などはそのまま `JsonUtility.FromJson` でゲームの型に読める。利用者どうしの文章や画像のやりとりには使わない。
 
 `AcceptAsync` は先に取られた・期限切れ・取り下げ・見えない出品をエラーにせず、`Outcome`（`Matched` / `Taken` / `Expired` / `Cancelled` / `NotFound`）で返す。`Trade` は `Matched` のときだけ入る（`HasTrade`）。同じ取引への再送は `Matched`。`GRushTradeOptions.To` に疑似 ID を入れると指名の出品になり、`ExpiresInSec` は 600〜604800（0 なら 3 日）。受付中の出品は 1 人 10 件まで。`ListAsync` は他人の公開の出品と自分宛ての指名の出品のうち、受付中のもの（新しい順）。`ReportAsync(tradeId)` は GameRush が確認を出し、承諾されたら `true`。通報すると出品者をブロックする。`GRush.IsTradeAvailable` が `false`（`protocolVersion` 7 未満）ではどれも `Unsupported`。
