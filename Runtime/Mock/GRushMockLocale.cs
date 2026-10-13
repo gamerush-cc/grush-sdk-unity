@@ -13,9 +13,17 @@ namespace GRushSdk
 
         public static void Set(string newLocale, string newSource, string[] newLanguages)
         {
+            var before = CurrentJson();
             locale = string.IsNullOrEmpty(newLocale) ? null : newLocale;
             source = string.IsNullOrEmpty(newSource) ? "user" : newSource;
-            languages = newLanguages;
+            var kept = GRushLocaleDefaults.Clean(newLanguages);
+            // 空なら端末の言語からの既定に戻す。
+            languages = kept.Length > 0 ? kept : null;
+            // ランタイムと同じく、値が変わらなければ通知しない。
+            if (CurrentJson() == before)
+            {
+                return;
+            }
             var handler = Changed;
             if (handler != null)
             {

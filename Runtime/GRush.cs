@@ -235,6 +235,10 @@ namespace GRushSdk
             }
         }
 
+        /// <summary>
+        /// バックエンドを差し替える。null なら実行環境に合うものを作り直す。
+        /// 登録済みの <c>Locale.Changed</c> は新しいバックエンドの通知を受け続ける。
+        /// </summary>
         public static void UseBackend(IGRushBackend replacement)
         {
             var previous = backend as IGRushLocaleBackend;
@@ -247,12 +251,13 @@ namespace GRushSdk
             leaderboards = null;
             playerState = null;
             share = null;
-            locale = null;
             analytics = null;
             inbox = null;
             trade = null;
             launch = null;
             backend = replacement ?? GRushBackendFactory.Create();
+            // Locale は作り直さない。作者が登録した Changed を新しいバックエンドで受け続ける。
+            locale?.Rebind();
         }
 
         internal static Task<GRushResult<string>> CallAsync(string method, string paramsJson)
