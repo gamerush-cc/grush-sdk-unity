@@ -10,12 +10,6 @@ namespace GRushSdk
         public string[] Languages;
     }
 
-    public interface IGRushLocaleBackend
-    {
-        string LocaleCurrentJson();
-        void SetLocaleChangedHandler(Action<string> handler);
-    }
-
     [Serializable]
     internal class GRushLocaleWire
     {
@@ -27,7 +21,7 @@ namespace GRushSdk
     public sealed class GRushLocaleApi
     {
         private Action<GRushLocale> changed;
-        private bool subscribed;
+        private GRushLocaleSubscription subscription;
 
         public event Action<GRushLocale> Changed
         {
@@ -92,22 +86,27 @@ namespace GRushSdk
         // GRush.UseBackend の後に呼ぶ。登録済みの Changed を新しいバックエンドへつなぎ直す。
         internal void Rebind()
         {
-            subscribed = false;
-            if (changed != null)
-            {
-                Subscribe();
-            }
+            Subscription().Rebind(LocaleBackend(), changed != null);
         }
 
         private void Subscribe()
         {
-            var backend = GRush.Backend as IGRushLocaleBackend;
-            if (subscribed || !GRush.IsLocaleAvailable || backend == null)
+            Subscription().Subscribe(LocaleBackend(), changed != null);
+        }
+
+        // フィールドの初期化子からは OnChanged を渡せないので、最初に使うときに作る。
+        private GRushLocaleSubscription Subscription()
+        {
+            if (subscription == null)
             {
-                return;
+                subscription = new GRushLocaleSubscription(OnChanged);
             }
-            subscribed = true;
-            backend.SetLocaleChangedHandler(OnChanged);
+            return subscription;
+        }
+
+        private static IGRushLocaleBackend LocaleBackend()
+        {
+            return GRush.IsLocaleAvailable ? GRush.Backend as IGRushLocaleBackend : null;
         }
 
         private void OnChanged(string json)
