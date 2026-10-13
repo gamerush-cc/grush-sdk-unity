@@ -385,7 +385,11 @@ namespace GRushSdk
             var open = trades.FindAll(trade => trade.From == self && trade.Status == "open").Count;
             if (open >= MaxOpenTrades)
             {
-                return GRushRpcResponse.Failure(GRushErrorCode.RateLimited, "Too many open trades.");
+                // GameRush と同じく、待っても直らない上限なので RateLimited にしない。
+                return GRushRpcResponse.Failure(
+                    GRushErrorCode.InvalidParams,
+                    "Too many open trades. Cancel an open trade first."
+                );
             }
             var options = new GRushTradeOptions
             {

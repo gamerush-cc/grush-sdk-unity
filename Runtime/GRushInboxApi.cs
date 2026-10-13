@@ -19,7 +19,8 @@ namespace GRushSdk
         /// <summary>
         /// <paramref name="to"/>（同じゲームの疑似 ID）へ送る。<paramref name="kind"/> は
         /// <c>^[A-Za-z0-9._:-]{1,32}$</c>、<paramref name="payloadJson"/> は上の形の JSON。
-        /// 送れたら true。
+        /// 送れたら true。同じゲームの疑似 ID でない宛先は InvalidParams、送りすぎ（毎時・毎日の上限）は
+        /// RateLimited（時間が経てば回復する）。
         /// </summary>
         public async Task<GRushResult<bool>> SendAsync(string to, string kind, string payloadJson)
         {
