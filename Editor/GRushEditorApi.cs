@@ -89,7 +89,8 @@ namespace GRushSdk.Editor
             string title,
             string description,
             string howToPlay,
-            string visibility
+            string visibility,
+            bool declareAllAges
         )
         {
             var body = new StringBuilder("{");
@@ -98,8 +99,12 @@ namespace GRushSdk.Editor
             body.Append(",\"howToPlay\":").Append(GRushJsonText.Escape(howToPlay));
             body.Append(",\"visibility\":").Append(GRushJsonText.Escape(visibility));
             body.Append(",\"acceptTerms\":true");
-            body.Append(",\"confirmAssetRights\":true}");
-            return body.ToString();
+            body.Append(",\"confirmAssetRights\":true");
+            if (declareAllAges)
+            {
+                body.Append(",\"declareAllAges\":true");
+            }
+            return body.Append('}').ToString();
         }
 
         public static IEnumerator CreateGame(
@@ -108,6 +113,7 @@ namespace GRushSdk.Editor
             string description,
             string howToPlay,
             string visibility,
+            bool declareAllAges,
             Action<GRushGameSummary> onDone,
             Action<string> onError
         )
@@ -115,7 +121,7 @@ namespace GRushSdk.Editor
             var slot = new GRushHttpSlot();
             yield return client.Post(
                 "/api/games",
-                CreateGameBody(title, description, howToPlay, visibility),
+                CreateGameBody(title, description, howToPlay, visibility, declareAllAges),
                 slot
             );
             var errorCode =
@@ -124,6 +130,13 @@ namespace GRushSdk.Editor
             {
                 onError(
                     "サーバが素材の権利の確認を受け付けませんでした。GameRush SDK を最新版に更新してから、もう一度作成してください。"
+                );
+                yield break;
+            }
+            if (!slot.Result.Ok && errorCode == "ageRating.declarationRequired")
+            {
+                onError(
+                    "ゲームを作れませんでした。全年齢向けの内容であることの申告が要ります。申告のチェックを入れてから、もう一度作成してください。"
                 );
                 yield break;
             }
